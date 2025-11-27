@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { productos as productosIniciales } from '../../data/admin/productos';
+import DataService from '../../utils/DataService'; // Importar DataService
 
 const Productos = () => {
   const [productos, setProductos] = useState([]);
@@ -8,29 +8,29 @@ const Productos = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('todas');
   const [stockFilter, setStockFilter] = useState('todos');
-  const [sortBy, setSortBy] = useState('codigo');
-  
+  const [sortBy, setSortBy] = useState('prodId');
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProducto, setSelectedProducto] = useState(null);
   const [formData, setFormData] = useState({
-    categoria: 'Merchandising de Bandas',
-    nombre: '',
-    precio: '',
-    stock: '',
-    stockCritico: '',
-    estado: 'activo'
+    nombreProducto: '',
+    detalleProd: '',
+    precioProd: '',
+    moneda: 'CLP',
+    imagen: '',
+    categoria: { categoriaId: 1 } // Categoría por defecto
   });
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
-
+  // Estados para categorías
   const [categorias, setCategorias] = useState([]);
   const [showCategoriaModal, setShowCategoriaModal] = useState(false);
   const [nuevaCategoria, setNuevaCategoria] = useState('');
   const [categoriaError, setCategoriaError] = useState('');
 
-  
+  // Reportes (por ahora estáticos)
   const [reportes] = useState({
     productosMasVendidos: [
       { nombre: 'Polera Banda "Santaferia"', ventas: 45, ingresos: 674550 },
@@ -55,178 +55,112 @@ const Productos = () => {
     ]
   });
 
-  
-  const cargarProductos = () => {
-    const productosGuardados = localStorage.getItem('productos');
-    if (productosGuardados) {
-      return JSON.parse(productosGuardados);
+  // Cargar productos desde el backend
+  const cargarProductos = async () => {
+    try {
+      setLoading(true);
+      const data = await DataService.getProductos();
+      console.log("Productos cargados:", data);
+      setProductos(data);
+      setFilteredProductos(data);
+    } catch (error) {
+      console.error("Error al cargar productos:", error);
+      alert("Error al cargar productos: " + error.message);
+    } finally {
+      setLoading(false);
     }
-    return productosIniciales;
   };
 
-  
+  // Cargar categorías (por ahora estáticas, luego integrar con backend)
   const cargarCategorias = () => {
-    const categoriasGuardadas = localStorage.getItem('categorias');
-    if (categoriasGuardadas) {
-      return JSON.parse(categoriasGuardadas);
-    }
-    
-    return ['Merchandising de Bandas', 'Vestimenta Huasa', 'Pañuelos de Cueca', 'Tickets de Consumo', 'Entradas'];
-  };
-
-  
-  const guardarProductos = (productosData) => {
-    localStorage.setItem('productos', JSON.stringify(productosData));
-  };
-
-  
-  const guardarCategorias = (categoriasData) => {
-    localStorage.setItem('categorias', JSON.stringify(categoriasData));
-  };
-
-  
-  const generarCodigo = (categoria) => {
-    const categoriasMap = {
-      'Merchandising de Bandas': 'MB',
-      'Vestimenta Huasa': 'VH',
-      'Pañuelos de Cueca': 'PQ',
-      'Tickets de Consumo': 'TC',
-      'Entradas': 'EN'
-    };
-    
-    
-    categorias.forEach(cat => {
-      if (!categoriasMap[cat]) {
-        const palabras = cat.split(' ');
-        const prefijo = palabras.map(p => p.charAt(0)).join('').toUpperCase();
-        categoriasMap[cat] = prefijo.substring(0, 2);
-      }
-    });
-    
-    const prefijo = categoriasMap[categoria] || 'PR';
-    const productosCategoria = productos.filter(p => p.codigo.startsWith(prefijo));
-    const siguienteNumero = productosCategoria.length > 0 
-      ? Math.max(...productosCategoria.map(p => parseInt(p.codigo.replace(prefijo, '')))) + 1
-      : 1;
-    
-    return `${prefijo}${siguienteNumero.toString().padStart(3, '0')}`;
-  };
-
-  
-  const handleAgregarCategoria = () => {
-    if (!nuevaCategoria.trim()) {
-      setCategoriaError('El nombre de la categoría es obligatorio');
-      return;
-    }
-
-    if (categorias.includes(nuevaCategoria.trim())) {
-      setCategoriaError('Esta categoría ya existe');
-      return;
-    }
-
-    const nuevasCategorias = [...categorias, nuevaCategoria.trim()];
-    setCategorias(nuevasCategorias);
-    guardarCategorias(nuevasCategorias);
-    
-    
-    setFormData(prev => ({
-      ...prev,
-      categoria: nuevaCategoria.trim()
-    }));
-    
-    setNuevaCategoria('');
-    setCategoriaError('');
-    setShowCategoriaModal(false);
+    return [
+      { categoriaId: 1, nombre: 'Merchandising de Bandas' },
+      { categoriaId: 2, nombre: 'Vestimenta Huasa' },
+      { categoriaId: 3, nombre: 'Pañuelos de Cueca' },
+      { categoriaId: 4, nombre: 'Tickets de Consumo' },
+      { categoriaId: 5, nombre: 'Entradas' }
+    ];
   };
 
   useEffect(() => {
-    const productosData = cargarProductos();
+    cargarProductos();
     const categoriasData = cargarCategorias();
-    setProductos(productosData);
     setCategorias(categoriasData);
-    setFilteredProductos(productosData);
   }, []);
 
   useEffect(() => {
     let filtered = productos;
 
-    
+    // Filtro por búsqueda
     if (searchTerm) {
       filtered = filtered.filter(producto => 
-        producto.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        producto.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        producto.categoria.toLowerCase().includes(searchTerm.toLowerCase())
+        producto.nombreProducto?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        producto.detalleProd?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (producto.categoria?.nombre || '').toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    
+    // Filtro por categoría
     if (categoriaFilter !== 'todas') {
-      filtered = filtered.filter(producto => producto.categoria === categoriaFilter);
-    }
-
-    
-    if (stockFilter === 'critico') {
       filtered = filtered.filter(producto => 
-        producto.stock > 0 && producto.stock <= producto.stockCritico
+        producto.categoria?.nombre === categoriaFilter
       );
-    } else if (stockFilter === 'sin-stock') {
-      filtered = filtered.filter(producto => producto.stock === 0);
-    } else if (stockFilter === 'con-stock') {
-      filtered = filtered.filter(producto => producto.stock > 0);
     }
 
-    
+    // Filtro por stock (simulado - tu backend no tiene stock)
+    if (stockFilter === 'sin-stock') {
+      filtered = filtered.filter(producto => !producto.disponible);
+    } else if (stockFilter === 'con-stock') {
+      filtered = filtered.filter(producto => producto.disponible);
+    }
+
+    // Ordenamiento
     filtered = [...filtered].sort((a, b) => {
       switch (sortBy) {
-        case 'nombre':
-          return a.nombre.localeCompare(b.nombre);
-        case 'precio':
-          return b.precio - a.precio;
-        case 'stock':
-          return a.stock - b.stock;
+        case 'nombreProducto':
+          return (a.nombreProducto || '').localeCompare(b.nombreProducto || '');
+        case 'precioProd':
+          return (b.precioProd || 0) - (a.precioProd || 0);
         case 'categoria':
-          return a.categoria.localeCompare(b.categoria);
-        case 'codigo':
+          return (a.categoria?.nombre || '').localeCompare(b.categoria?.nombre || '');
+        case 'prodId':
         default:
-          return a.codigo.localeCompare(b.codigo);
+          return (a.prodId || 0) - (b.prodId || 0);
       }
     });
 
     setFilteredProductos(filtered);
   }, [searchTerm, categoriaFilter, stockFilter, sortBy, productos]);
 
-  
+  // Validación del formulario
   const validarFormulario = () => {
     const nuevosErrores = {};
 
-    if (!formData.nombre.trim()) {
-      nuevosErrores.nombre = 'El nombre es obligatorio';
+    if (!formData.nombreProducto.trim()) {
+      nuevosErrores.nombreProducto = 'El nombre es obligatorio';
     }
 
-    if (!formData.precio || formData.precio <= 0) {
-      nuevosErrores.precio = 'El precio debe ser mayor a 0';
+    if (!formData.precioProd || formData.precioProd <= 0) {
+      nuevosErrores.precioProd = 'El precio debe ser mayor a 0';
     }
 
-    if (!formData.stock || formData.stock < 0) {
-      nuevosErrores.stock = 'El stock no puede ser negativo';
-    }
-
-    if (!formData.stockCritico || formData.stockCritico <= 0) {
-      nuevosErrores.stockCritico = 'El stock crítico debe ser mayor a 0';
+    if (!formData.detalleProd.trim()) {
+      nuevosErrores.detalleProd = 'La descripción es obligatoria';
     }
 
     setErrors(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
   };
 
+  // Manejar apertura de modales
   const handleOpenAddModal = () => {
     setFormData({
-      categoria: categorias[0] || 'Merchandising de Bandas',
-      nombre: '',
-      precio: '',
-      stock: '',
-      stockCritico: '',
-      estado: 'activo'
+      nombreProducto: '',
+      detalleProd: '',
+      precioProd: '',
+      moneda: 'CLP',
+      imagen: '',
+      categoria: { categoriaId: 1 }
     });
     setErrors({});
     setShowAddModal(true);
@@ -235,12 +169,12 @@ const Productos = () => {
   const handleOpenEditModal = (producto) => {
     setSelectedProducto(producto);
     setFormData({
-      categoria: producto.categoria,
-      nombre: producto.nombre,
-      precio: producto.precio,
-      stock: producto.stock,
-      stockCritico: producto.stockCritico,
-      estado: producto.estado
+      nombreProducto: producto.nombreProducto || '',
+      detalleProd: producto.detalleProd || '',
+      precioProd: producto.precioProd || '',
+      moneda: producto.moneda || 'CLP',
+      imagen: producto.imagen || '',
+      categoria: producto.categoria || { categoriaId: 1 }
     });
     setErrors({});
     setShowEditModal(true);
@@ -253,6 +187,7 @@ const Productos = () => {
     setErrors({});
   };
 
+  // Manejar cambios en el formulario
   const handleFormChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -267,56 +202,72 @@ const Productos = () => {
     }
   };
 
-  const handleFormSubmit = (e) => {
+  // Manejar envío del formulario - CONEXIÓN CON BACKEND
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     
     if (!validarFormulario()) return;
 
-    if (showAddModal) {
-      
-      const nuevoProducto = {
-        codigo: generarCodigo(formData.categoria),
-        categoria: formData.categoria,
-        nombre: formData.nombre.trim(),
-        precio: parseInt(formData.precio),
-        moneda: "CLP",
-        stock: parseInt(formData.stock),
-        stockCritico: parseInt(formData.stockCritico),
-        estado: formData.estado
-      };
+    try {
+      setLoading(true);
 
-      const updatedProductos = [...productos, nuevoProducto];
-      setProductos(updatedProductos);
-      guardarProductos(updatedProductos);
-    } else if (showEditModal && selectedProducto) {
-      
-      const updatedProductos = productos.map(producto =>
-        producto.codigo === selectedProducto.codigo
-          ? { 
-              ...producto, 
-              categoria: formData.categoria,
-              nombre: formData.nombre.trim(),
-              precio: parseInt(formData.precio),
-              stock: parseInt(formData.stock),
-              stockCritico: parseInt(formData.stockCritico),
-              estado: formData.estado
-            }
-          : producto
-      );
-      setProductos(updatedProductos);
-      guardarProductos(updatedProductos);
+      if (showAddModal) {
+        // Crear nuevo producto
+        const nuevoProducto = {
+          nombreProducto: formData.nombreProducto.trim(),
+          detalleProd: formData.detalleProd.trim(),
+          precioProd: parseInt(formData.precioProd),
+          moneda: formData.moneda,
+          imagen: formData.imagen,
+          categoria: formData.categoria
+        };
+
+        console.log("Creando producto:", nuevoProducto);
+        await DataService.addProducto(nuevoProducto);
+        alert('Producto creado exitosamente');
+      } else if (showEditModal && selectedProducto) {
+        // Actualizar producto existente
+        const productoActualizado = {
+          prodId: selectedProducto.prodId,
+          nombreProducto: formData.nombreProducto.trim(),
+          detalleProd: formData.detalleProd.trim(),
+          precioProd: parseInt(formData.precioProd),
+          moneda: formData.moneda,
+          imagen: formData.imagen,
+          categoria: formData.categoria
+        };
+
+        console.log("Actualizando producto:", productoActualizado);
+        await DataService.updateProducto(productoActualizado);
+        alert('Producto actualizado exitosamente');
+      }
+
+      await cargarProductos();
+      handleCloseModals();
+    } catch (error) {
+      console.error("Error al guardar producto:", error);
+      alert("Error al guardar producto: " + error.message);
+    } finally {
+      setLoading(false);
     }
-
-    handleCloseModals();
   };
 
-  const handleDeleteProducto = (codigo) => {
-    const producto = productos.find(p => p.codigo === codigo);
+  // Eliminar producto - CONEXIÓN CON BACKEND
+  const handleDeleteProducto = async (id) => {
+    const producto = productos.find(p => p.prodId === id);
     
-    if (window.confirm(`¿Estás seguro de que deseas eliminar el producto "${producto.nombre}"?`)) {
-      const updatedProductos = productos.filter(p => p.codigo !== codigo);
-      setProductos(updatedProductos);
-      guardarProductos(updatedProductos);
+    if (window.confirm(`¿Estás seguro de que deseas eliminar el producto "${producto?.nombreProducto}"?`)) {
+      try {
+        setLoading(true);
+        await DataService.deleteProducto(id);
+        alert('Producto eliminado exitosamente');
+        await cargarProductos();
+      } catch (error) {
+        console.error("Error al eliminar producto:", error);
+        alert("Error al eliminar producto: " + error.message);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -324,33 +275,33 @@ const Productos = () => {
     setSearchTerm('');
     setCategoriaFilter('todas');
     setStockFilter('todos');
-    setSortBy('codigo');
+    setSortBy('prodId');
   };
 
-  const resetToDefault = () => {
-    if (window.confirm('¿Restaurar lista de productos a los valores por defecto?')) {
-      setProductos(productosIniciales);
-      guardarProductos(productosIniciales);
-      const categoriasPorDefecto = ['Merchandising de Bandas', 'Vestimenta Huasa', 'Pañuelos de Cueca', 'Tickets de Consumo', 'Entradas'];
-      setCategorias(categoriasPorDefecto);
-      guardarCategorias(categoriasPorDefecto);
-    }
-  };
+  // Estadísticas (simuladas)
+  const productosSinStock = productos.filter(p => !p.disponible).length;
+  const productosActivos = productos.length;
 
-  
-  const productosSinStock = productos.filter(p => p.stock === 0).length;
-  const productosStockCritico = productos.filter(p => p.stock > 0 && p.stock <= p.stockCritico).length;
-  const productosActivos = productos.filter(p => p.estado === 'activo').length;
-
-  
-  const formatPrice = (price) => {
+  // Formatear precio
+  const formatPrice = (price, currency = 'CLP') => {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
-      currency: 'CLP'
+      currency: currency
     }).format(price);
   };
+
   return (
     <div className="container-fluid" style={{ position: 'relative', zIndex: 2 }}>
+      {/* Loading overlay */}
+      {loading && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
+             style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999 }}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      )}
+
       {/* Filtros avanzados */}
       <div className="row mb-4">
         <div className="col-12">
@@ -368,11 +319,12 @@ const Productos = () => {
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Buscar por nombre, código o categoría..."
+                      placeholder="Buscar por nombre, descripción o categoría..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
+                      disabled={loading}
                     />
-                    <button className="btn btn-outline-secondary" type="button">
+                    <button className="btn btn-outline-secondary" type="button" disabled={loading}>
                       <i className="bi bi-search"></i>
                     </button>
                   </div>
@@ -385,26 +337,27 @@ const Productos = () => {
                     className="form-select"
                     value={categoriaFilter}
                     onChange={(e) => setCategoriaFilter(e.target.value)}
+                    disabled={loading}
                   >
                     <option value="todas">Todas las categorías</option>
                     {categorias.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat.categoriaId} value={cat.nombre}>{cat.nombre}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Filtro por stock */}
+                {/* Filtro por disponibilidad */}
                 <div className="col-md-2">
-                  <label className="form-label small fw-bold text-muted">Estado Stock</label>
+                  <label className="form-label small fw-bold text-muted">Disponibilidad</label>
                   <select 
                     className="form-select"
                     value={stockFilter}
                     onChange={(e) => setStockFilter(e.target.value)}
+                    disabled={loading}
                   >
                     <option value="todos">Todos</option>
-                    <option value="con-stock">Con stock</option>
-                    <option value="sin-stock">Sin stock</option>
-                    <option value="critico">Stock crítico</option>
+                    <option value="con-stock">Disponibles</option>
+                    <option value="sin-stock">No disponibles</option>
                   </select>
                 </div>
 
@@ -415,11 +368,11 @@ const Productos = () => {
                     className="form-select"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
+                    disabled={loading}
                   >
-                    <option value="codigo">Código</option>
-                    <option value="nombre">Nombre</option>
-                    <option value="precio">Precio</option>
-                    <option value="stock">Stock</option>
+                    <option value="prodId">ID</option>
+                    <option value="nombreProducto">Nombre</option>
+                    <option value="precioProd">Precio</option>
                     <option value="categoria">Categoría</option>
                   </select>
                 </div>
@@ -431,6 +384,7 @@ const Productos = () => {
                       className="btn btn-outline-secondary flex-fill"
                       onClick={clearFilters}
                       title="Limpiar filtros"
+                      disabled={loading}
                     >
                       <i className="bi bi-arrow-clockwise"></i>
                     </button>
@@ -438,6 +392,7 @@ const Productos = () => {
                       className="btn btn-primary flex-fill"
                       onClick={handleOpenAddModal}
                       title="Agregar producto"
+                      disabled={loading}
                     >
                       <i className="bi bi-plus-lg"></i>
                     </button>
@@ -445,14 +400,14 @@ const Productos = () => {
                 </div>
               </div>
 
-              {/* Contador de resultados y botón reset */}
+              {/* Contador de resultados */}
               <div className="row mt-3">
                 <div className="col-12">
                   <div className="d-flex justify-content-between align-items-center">
                     <small className="text-muted">
                       Mostrando <strong>{filteredProductos.length}</strong> de <strong>{productos.length}</strong> productos
                       {categoriaFilter !== 'todas' && ` • Categoría: ${categoriaFilter}`}
-                      {stockFilter !== 'todos' && ` • Stock: ${stockFilter === 'critico' ? 'Crítico' : stockFilter === 'sin-stock' ? 'Sin stock' : 'Con stock'}`}
+                      {stockFilter !== 'todos' && ` • Disponibilidad: ${stockFilter === 'sin-stock' ? 'No disponible' : 'Disponible'}`}
                       {searchTerm && ` • Búsqueda: "${searchTerm}"`}
                     </small>
                     <div className="d-flex gap-2">
@@ -460,17 +415,11 @@ const Productos = () => {
                         <button 
                           className="btn btn-sm btn-link text-muted p-0"
                           onClick={clearFilters}
+                          disabled={loading}
                         >
                           Limpiar filtros
                         </button>
                       )}
-                      <button 
-                        className="btn btn-sm btn-outline-warning"
-                        onClick={resetToDefault}
-                        title="Restaurar productos por defecto"
-                      >
-                        <i className="bi bi-arrow-counterclockwise"></i> Restaurar
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -488,22 +437,9 @@ const Productos = () => {
               <div className="d-flex justify-content-between">
                 <div>
                   <h3 className="text-danger">{productosSinStock}</h3>
-                  <p className="mb-0 text-muted">Productos sin stock</p>
+                  <p className="mb-0 text-muted">Productos no disponibles</p>
                 </div>
                 <i className="bi bi-exclamation-triangle text-danger" style={{ fontSize: '2rem' }}></i>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="card bg-warning bg-opacity-10 border-warning">
-            <div className="card-body">
-              <div className="d-flex justify-content-between">
-                <div>
-                  <h3 className="text-warning">{productosStockCritico}</h3>
-                  <p className="mb-0 text-muted">Stock crítico</p>
-                </div>
-                <i className="bi bi-speedometer2 text-warning" style={{ fontSize: '2rem' }}></i>
               </div>
             </div>
           </div>
@@ -514,9 +450,22 @@ const Productos = () => {
               <div className="d-flex justify-content-between">
                 <div>
                   <h3 className="text-success">{productosActivos}</h3>
-                  <p className="mb-0 text-muted">Productos activos</p>
+                  <p className="mb-0 text-muted">Total de productos</p>
                 </div>
-                <i className="bi bi-check-circle text-success" style={{ fontSize: '2rem' }}></i>
+                <i className="bi bi-box-seam text-success" style={{ fontSize: '2rem' }}></i>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-4">
+          <div className="card bg-info bg-opacity-10 border-info">
+            <div className="card-body">
+              <div className="d-flex justify-content-between">
+                <div>
+                  <h3 className="text-info">{categorias.length}</h3>
+                  <p className="mb-0 text-muted">Categorías activas</p>
+                </div>
+                <i className="bi bi-tags text-info" style={{ fontSize: '2rem' }}></i>
               </div>
             </div>
           </div>
@@ -550,16 +499,18 @@ const Productos = () => {
                         className="btn-close btn-close-white ms-1"
                         style={{ fontSize: '0.6rem' }}
                         onClick={() => setCategoriaFilter('todas')}
+                        disabled={loading}
                       ></button>
                     </span>
                   )}
                   {stockFilter !== 'todos' && (
                     <span className="badge bg-info text-dark">
-                      Stock: {stockFilter === 'critico' ? 'Crítico' : stockFilter === 'sin-stock' ? 'Sin stock' : 'Con stock'}
+                      Disponibilidad: {stockFilter === 'sin-stock' ? 'No disponible' : 'Disponible'}
                       <button 
                         className="btn-close ms-1"
                         style={{ fontSize: '0.6rem' }}
                         onClick={() => setStockFilter('todos')}
+                        disabled={loading}
                       ></button>
                     </span>
                   )}
@@ -570,6 +521,7 @@ const Productos = () => {
                         className="btn-close btn-close-white ms-1"
                         style={{ fontSize: '0.6rem' }}
                         onClick={() => setSearchTerm('')}
+                        disabled={loading}
                       ></button>
                     </span>
                   )}
@@ -581,12 +533,11 @@ const Productos = () => {
               <table className="table table-hover text-nowrap mb-0">
                 <thead style={{ backgroundColor: 'rgba(248,249,250,0.9)' }}>
                   <tr>
-                    <th style={{ border: 'none', padding: '12px 16px', fontWeight: '600', color: '#333' }}>Código</th>
+                    <th style={{ border: 'none', padding: '12px 16px', fontWeight: '600', color: '#333' }}>ID</th>
                     <th style={{ border: 'none', padding: '12px 16px', fontWeight: '600', color: '#333' }}>Nombre</th>
                     <th style={{ border: 'none', padding: '12px 16px', fontWeight: '600', color: '#333' }}>Categoría</th>
                     <th style={{ border: 'none', padding: '12px 16px', fontWeight: '600', color: '#333' }}>Precio</th>
-                    <th style={{ border: 'none', padding: '12px 16px', fontWeight: '600', color: '#333' }}>Stock</th>
-                    <th style={{ border: 'none', padding: '12px 16px', fontWeight: '600', color: '#333' }}>Estado</th>
+                    <th style={{ border: 'none', padding: '12px 16px', fontWeight: '600', color: '#333' }}>Descripción</th>
                     <th style={{ 
                       width: '120px', 
                       border: 'none', 
@@ -600,48 +551,31 @@ const Productos = () => {
                 <tbody>
                   {filteredProductos.length > 0 ? (
                     filteredProductos.map(producto => (
-                      <tr key={producto.codigo} style={{ 
-                        backgroundColor: producto.stock === 0 ? 'rgba(220,53,69,0.05)' : 
-                                       producto.stock <= producto.stockCritico ? 'rgba(255,193,7,0.05)' : 'rgba(255,255,255,0.8)',
+                      <tr key={producto.prodId} style={{ 
+                        backgroundColor: 'rgba(255,255,255,0.8)',
                         transition: 'background-color 0.2s ease'
                       }}>
                         <td style={{ border: 'none', padding: '12px 16px', color: '#666', fontWeight: '500' }}>
-                          {producto.codigo}
+                          {producto.prodId}
                         </td>
                         <td style={{ border: 'none', padding: '12px 16px', color: '#333', fontWeight: '500' }}>
-                          {producto.nombre}
+                          {producto.nombreProducto}
                         </td>
                         <td style={{ border: 'none', padding: '12px 16px', color: '#666' }}>
-                          {producto.categoria}
+                          {producto.categoria?.nombre || 'Sin categoría'}
                         </td>
                         <td style={{ border: 'none', padding: '12px 16px', color: '#666', fontWeight: '500' }}>
-                          {formatPrice(producto.precio)}
+                          {formatPrice(producto.precioProd, producto.moneda)}
                         </td>
-                        <td style={{ border: 'none', padding: '12px 16px' }}>
-                          <div className="d-flex align-items-center">
-                            <span className={`badge ${
-                              producto.stock === 0 ? 'bg-danger' : 
-                              producto.stock <= producto.stockCritico ? 'bg-warning' : 'bg-success'
-                            }`}>
-                              {producto.stock} unidades
-                            </span>
-                            {producto.stock > 0 && producto.stock <= producto.stockCritico && (
-                              <small className="text-warning ms-2">
-                                <i className="bi bi-exclamation-triangle"></i>
-                              </small>
-                            )}
-                          </div>
-                        </td>
-                        <td style={{ border: 'none', padding: '12px 16px' }}>
-                          <span className={`badge ${producto.estado === 'activo' ? 'bg-success' : 'bg-secondary'}`}>
-                            {producto.estado === 'activo' ? 'Activo' : 'Inactivo'}
-                          </span>
+                        <td style={{ border: 'none', padding: '12px 16px', color: '#666' }}>
+                          {producto.detalleProd?.substring(0, 50)}...
                         </td>
                         <td style={{ border: 'none', padding: '12px 16px', textAlign: 'center' }}>
                           <button 
                             className="btn btn-sm btn-outline-primary me-1"
                             onClick={() => handleOpenEditModal(producto)}
                             title="Editar producto"
+                            disabled={loading}
                             style={{ 
                               border: '1px solid #007bff',
                               borderRadius: '4px',
@@ -652,8 +586,9 @@ const Productos = () => {
                           </button>
                           <button 
                             className="btn btn-sm btn-outline-danger"
-                            onClick={() => handleDeleteProducto(producto.codigo)}
+                            onClick={() => handleDeleteProducto(producto.prodId)}
                             title="Eliminar producto"
+                            disabled={loading}
                             style={{ 
                               border: '1px solid #dc3545',
                               borderRadius: '4px',
@@ -667,7 +602,7 @@ const Productos = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="7" className="text-center py-5" style={{ border: 'none' }}>
+                      <td colSpan="6" className="text-center py-5" style={{ border: 'none' }}>
                         <i className="bi bi-box display-4 text-muted d-block mb-3"></i>
                         <p className="text-muted mb-2" style={{ fontSize: '1.1rem' }}>No se encontraron productos</p>
                         <small className="text-muted">Intenta ajustar los filtros de búsqueda</small>
@@ -681,7 +616,7 @@ const Productos = () => {
         </div>
       </div>
 
-      {/* Reportes de Productos */}
+      {/* Reportes de Productos (se mantienen igual) */}
       <div className="row mt-5">
         <div className="col-12">
           <h4 className="mb-4" style={{ color: '#333', borderBottom: '2px solid #007bff', paddingBottom: '0.5rem' }}>
@@ -788,245 +723,297 @@ const Productos = () => {
         </div>
       </div>
 
-        {/* Modal Agregar Producto */}
-        {showAddModal && (
-  <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1080 }}>
-    <div className="modal-dialog modal-dialog-centered">
-      <div className="modal-content">
-        <div className="modal-header bg-primary text-white">
-          <h5 className="modal-title">
-            <i className="bi bi-plus-circle me-2"></i>
-            Agregar Nuevo Producto
-          </h5>
-          <button type="button" className="btn-close btn-close-white" onClick={handleCloseModals}></button>
-        </div>
-        <form onSubmit={handleFormSubmit}>
-          <div className="modal-body">
-            <div className="row g-3">
-              <div className="col-12">
-                <label className="form-label fw-semibold">Categoría *</label>
-                <select
-                  className="form-select"
-                  value={formData.categoria}
-                  onChange={(e) => handleFormChange('categoria', e.target.value)}
-                >
-                  {categorias.map(categoria => (
-                    <option key={categoria} value={categoria}>{categoria}</option>
-                  ))}
-                </select>
-                <div className="form-text">
-                  ¿No encuentras la categoría? 
-                  <Link to="/admin/categorias" className="ms-1">
-                    Crear nueva categoría
-                  </Link>
+      {/* Modal Agregar Producto - ACTUALIZADO */}
+      {showAddModal && (
+        <>
+          <div className="modal-backdrop show"></div>
+          <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header bg-primary text-white">
+                  <h5 className="modal-title">
+                    <i className="bi bi-plus-circle me-2"></i>
+                    Agregar Nuevo Producto
+                  </h5>
+                  <button 
+                    type="button" 
+                    className="btn-close btn-close-white" 
+                    onClick={handleCloseModals}
+                    disabled={loading}
+                  ></button>
                 </div>
-              </div>
+                <form onSubmit={handleFormSubmit}>
+                  <div className="modal-body">
+                    <div className="row g-3">
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Categoría *</label>
+                        <select
+                          className="form-select"
+                          value={formData.categoria.categoriaId}
+                          onChange={(e) => handleFormChange('categoria', { 
+                            ...formData.categoria, 
+                            categoriaId: parseInt(e.target.value) 
+                          })}
+                          disabled={loading}
+                        >
+                          {categorias.map(categoria => (
+                            <option key={categoria.categoriaId} value={categoria.categoriaId}>
+                              {categoria.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-              <div className="col-12">
-                <label className="form-label fw-semibold">Nombre del Producto *</label>
-                <input
-                  type="text"
-                  className={`form-control ${errors.nombre ? 'is-invalid' : ''}`}
-                  value={formData.nombre}
-                  onChange={(e) => handleFormChange('nombre', e.target.value)}
-                  placeholder="Ingrese nombre del producto"
-                />
-                {errors.nombre && <div className="invalid-feedback">{errors.nombre}</div>}
-              </div>
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Nombre del Producto *</label>
+                        <input
+                          type="text"
+                          className={`form-control ${errors.nombreProducto ? 'is-invalid' : ''}`}
+                          value={formData.nombreProducto}
+                          onChange={(e) => handleFormChange('nombreProducto', e.target.value)}
+                          placeholder="Ingrese nombre del producto"
+                          disabled={loading}
+                        />
+                        {errors.nombreProducto && <div className="invalid-feedback">{errors.nombreProducto}</div>}
+                      </div>
 
-              <div className="col-6">
-                <label className="form-label fw-semibold">Precio (CLP) *</label>
-                <input
-                  type="number"
-                  className={`form-control ${errors.precio ? 'is-invalid' : ''}`}
-                  value={formData.precio}
-                  onChange={(e) => handleFormChange('precio', e.target.value)}
-                  placeholder="0"
-                  min="1"
-                />
-                {errors.precio && <div className="invalid-feedback">{errors.precio}</div>}
-              </div>
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Descripción *</label>
+                        <textarea
+                          className={`form-control ${errors.detalleProd ? 'is-invalid' : ''}`}
+                          value={formData.detalleProd}
+                          onChange={(e) => handleFormChange('detalleProd', e.target.value)}
+                          placeholder="Ingrese descripción del producto"
+                          rows="3"
+                          disabled={loading}
+                        />
+                        {errors.detalleProd && <div className="invalid-feedback">{errors.detalleProd}</div>}
+                      </div>
 
-              <div className="col-6">
-                <label className="form-label fw-semibold">Estado</label>
-                <select
-                  className="form-select"
-                  value={formData.estado}
-                  onChange={(e) => handleFormChange('estado', e.target.value)}
-                >
-                  <option value="activo">Activo</option>
-                  <option value="inactivo">Inactivo</option>
-                </select>
-              </div>
+                      <div className="col-6">
+                        <label className="form-label fw-semibold">Precio *</label>
+                        <input
+                          type="number"
+                          className={`form-control ${errors.precioProd ? 'is-invalid' : ''}`}
+                          value={formData.precioProd}
+                          onChange={(e) => handleFormChange('precioProd', e.target.value)}
+                          placeholder="0"
+                          min="1"
+                          disabled={loading}
+                        />
+                        {errors.precioProd && <div className="invalid-feedback">{errors.precioProd}</div>}
+                      </div>
 
-              <div className="col-6">
-                <label className="form-label fw-semibold">Stock Inicial *</label>
-                <input
-                  type="number"
-                  className={`form-control ${errors.stock ? 'is-invalid' : ''}`}
-                  value={formData.stock}
-                  onChange={(e) => handleFormChange('stock', e.target.value)}
-                  placeholder="0"
-                  min="0"
-                />
-                {errors.stock && <div className="invalid-feedback">{errors.stock}</div>}
-              </div>
+                      <div className="col-6">
+                        <label className="form-label fw-semibold">Moneda</label>
+                        <select
+                          className="form-select"
+                          value={formData.moneda}
+                          onChange={(e) => handleFormChange('moneda', e.target.value)}
+                          disabled={loading}
+                        >
+                          <option value="CLP">CLP</option>
+                          <option value="USD">USD</option>
+                        </select>
+                      </div>
 
-              <div className="col-6">
-                <label className="form-label fw-semibold">Stock Crítico *</label>
-                <input
-                  type="number"
-                  className={`form-control ${errors.stockCritico ? 'is-invalid' : ''}`}
-                  value={formData.stockCritico}
-                  onChange={(e) => handleFormChange('stockCritico', e.target.value)}
-                  placeholder="0"
-                  min="1"
-                />
-                {errors.stockCritico && <div className="invalid-feedback">{errors.stockCritico}</div>}
-                <div className="form-text">Alerta cuando el stock sea menor o igual</div>
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">URL de Imagen</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={formData.imagen}
+                          onChange={(e) => handleFormChange('imagen', e.target.value)}
+                          placeholder="https://ejemplo.com/imagen.jpg"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary" 
+                      onClick={handleCloseModals}
+                      disabled={loading}
+                    >
+                      <i className="bi bi-x-circle me-1"></i> Cancelar
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1" role="status"></span>
+                          Creando...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check-circle me-1"></i> Crear Producto
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={handleCloseModals}>
-              <i className="bi bi-x-circle me-1"></i> Cancelar
-            </button>
-            <button type="submit" className="btn btn-primary">
-              <i className="bi bi-check-circle me-1"></i> Crear Producto
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-)}
+        </>
+      )}
 
-{/* Modal Editar Producto */}
-{showEditModal && selectedProducto && (
-  <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1080 }}>
-    <div className="modal-dialog modal-dialog-centered">
-      <div className="modal-content">
-        <div className="modal-header bg-warning text-dark">
-          <h5 className="modal-title">
-            <i className="bi bi-pencil-square me-2"></i>
-            Editar Producto
-          </h5>
-          <button type="button" className="btn-close" onClick={handleCloseModals}></button>
-        </div>
-        <form onSubmit={handleFormSubmit}>
-          <div className="modal-body">
-            {/* Información del producto actual */}
-            <div className="alert alert-info">
-              <div className="row small">
-                <div className="col-6">
-                  <strong>Código:</strong> {selectedProducto.codigo}
+      {/* Modal Editar Producto - ACTUALIZADO */}
+      {showEditModal && selectedProducto && (
+        <>
+          <div className="modal-backdrop show"></div>
+          <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header bg-warning text-dark">
+                  <h5 className="modal-title">
+                    <i className="bi bi-pencil-square me-2"></i>
+                    Editar Producto
+                  </h5>
+                  <button 
+                    type="button" 
+                    className="btn-close" 
+                    onClick={handleCloseModals}
+                    disabled={loading}
+                  ></button>
                 </div>
-                <div className="col-6">
-                  <strong>Estado actual:</strong> 
-                  <span className={`badge ${selectedProducto.estado === 'activo' ? 'bg-success' : 'bg-secondary'} ms-1`}>
-                    {selectedProducto.estado}
-                  </span>
-                </div>
+                <form onSubmit={handleFormSubmit}>
+                  <div className="modal-body">
+                    {/* Información del producto actual */}
+                    <div className="alert alert-info">
+                      <div className="row small">
+                        <div className="col-6">
+                          <strong>ID:</strong> {selectedProducto.prodId}
+                        </div>
+                        <div className="col-6">
+                          <strong>Categoría actual:</strong> {selectedProducto.categoria?.nombre}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="row g-3">
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Categoría *</label>
+                        <select
+                          className="form-select"
+                          value={formData.categoria.categoriaId}
+                          onChange={(e) => handleFormChange('categoria', { 
+                            ...formData.categoria, 
+                            categoriaId: parseInt(e.target.value) 
+                          })}
+                          disabled={loading}
+                        >
+                          {categorias.map(categoria => (
+                            <option key={categoria.categoriaId} value={categoria.categoriaId}>
+                              {categoria.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Nombre del Producto *</label>
+                        <input
+                          type="text"
+                          className={`form-control ${errors.nombreProducto ? 'is-invalid' : ''}`}
+                          value={formData.nombreProducto}
+                          onChange={(e) => handleFormChange('nombreProducto', e.target.value)}
+                          placeholder="Ingrese nombre del producto"
+                          disabled={loading}
+                        />
+                        {errors.nombreProducto && <div className="invalid-feedback">{errors.nombreProducto}</div>}
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Descripción *</label>
+                        <textarea
+                          className={`form-control ${errors.detalleProd ? 'is-invalid' : ''}`}
+                          value={formData.detalleProd}
+                          onChange={(e) => handleFormChange('detalleProd', e.target.value)}
+                          placeholder="Ingrese descripción del producto"
+                          rows="3"
+                          disabled={loading}
+                        />
+                        {errors.detalleProd && <div className="invalid-feedback">{errors.detalleProd}</div>}
+                      </div>
+
+                      <div className="col-6">
+                        <label className="form-label fw-semibold">Precio *</label>
+                        <input
+                          type="number"
+                          className={`form-control ${errors.precioProd ? 'is-invalid' : ''}`}
+                          value={formData.precioProd}
+                          onChange={(e) => handleFormChange('precioProd', e.target.value)}
+                          placeholder="0"
+                          min="1"
+                          disabled={loading}
+                        />
+                        {errors.precioProd && <div className="invalid-feedback">{errors.precioProd}</div>}
+                      </div>
+
+                      <div className="col-6">
+                        <label className="form-label fw-semibold">Moneda</label>
+                        <select
+                          className="form-select"
+                          value={formData.moneda}
+                          onChange={(e) => handleFormChange('moneda', e.target.value)}
+                          disabled={loading}
+                        >
+                          <option value="CLP">CLP</option>
+                          <option value="USD">USD</option>
+                        </select>
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">URL de Imagen</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={formData.imagen}
+                          onChange={(e) => handleFormChange('imagen', e.target.value)}
+                          placeholder="https://ejemplo.com/imagen.jpg"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary" 
+                      onClick={handleCloseModals}
+                      disabled={loading}
+                    >
+                      <i className="bi bi-x-circle me-1"></i> Cancelar
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn btn-warning"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1" role="status"></span>
+                          Actualizando...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check-circle me-1"></i> Actualizar Producto
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
-
-            <div className="row g-3">
-              <div className="col-12">
-                <label className="form-label fw-semibold">Categoría *</label>
-                <select
-                  className="form-select"
-                  value={formData.categoria}
-                  onChange={(e) => handleFormChange('categoria', e.target.value)}
-                >
-                  {categorias.map(categoria => (
-                    <option key={categoria} value={categoria}>{categoria}</option>
-                  ))}
-                </select>
-                <div className="form-text">
-                  <Link to="/admin/categorias">
-                    Gestionar categorías
-                  </Link>
-                </div>
-              </div>
-
-              <div className="col-12">
-                <label className="form-label fw-semibold">Nombre del Producto *</label>
-                <input
-                  type="text"
-                  className={`form-control ${errors.nombre ? 'is-invalid' : ''}`}
-                  value={formData.nombre}
-                  onChange={(e) => handleFormChange('nombre', e.target.value)}
-                  placeholder="Ingrese nombre del producto"
-                />
-                {errors.nombre && <div className="invalid-feedback">{errors.nombre}</div>}
-              </div>
-
-              <div className="col-6">
-                <label className="form-label fw-semibold">Precio (CLP) *</label>
-                <input
-                  type="number"
-                  className={`form-control ${errors.precio ? 'is-invalid' : ''}`}
-                  value={formData.precio}
-                  onChange={(e) => handleFormChange('precio', e.target.value)}
-                  placeholder="0"
-                  min="1"
-                />
-                {errors.precio && <div className="invalid-feedback">{errors.precio}</div>}
-              </div>
-
-              <div className="col-6">
-                <label className="form-label fw-semibold">Estado</label>
-                <select
-                  className="form-select"
-                  value={formData.estado}
-                  onChange={(e) => handleFormChange('estado', e.target.value)}
-                >
-                  <option value="activo">Activo</option>
-                  <option value="inactivo">Inactivo</option>
-                </select>
-              </div>
-
-              <div className="col-6">
-                <label className="form-label fw-semibold">Stock Actual *</label>
-                <input
-                  type="number"
-                  className={`form-control ${errors.stock ? 'is-invalid' : ''}`}
-                  value={formData.stock}
-                  onChange={(e) => handleFormChange('stock', e.target.value)}
-                  placeholder="0"
-                  min="0"
-                />
-                {errors.stock && <div className="invalid-feedback">{errors.stock}</div>}
-              </div>
-
-              <div className="col-6">
-                <label className="form-label fw-semibold">Stock Crítico *</label>
-                <input
-                  type="number"
-                  className={`form-control ${errors.stockCritico ? 'is-invalid' : ''}`}
-                  value={formData.stockCritico}
-                  onChange={(e) => handleFormChange('stockCritico', e.target.value)}
-                  placeholder="0"
-                  min="1"
-                />
-                {errors.stockCritico && <div className="invalid-feedback">{errors.stockCritico}</div>}
-                <div className="form-text">Alerta cuando el stock sea menor o igual</div>
-              </div>
-            </div>
           </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={handleCloseModals}>
-              <i className="bi bi-x-circle me-1"></i> Cancelar
-            </button>
-            <button type="submit" className="btn btn-warning">
-              <i className="bi bi-check-circle me-1"></i> Actualizar Producto
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-)}
+        </>
+      )}
     </div>
   );
 };
