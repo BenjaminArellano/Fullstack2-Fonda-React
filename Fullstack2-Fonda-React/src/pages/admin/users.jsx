@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { usuarios as usuariosIniciales } from '../../data/admin/usuarios';
+import DataService from '../../utils/DataService';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -8,7 +7,6 @@ const Users = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('todos');
   const [sortBy, setSortBy] = useState('id');
-  
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -18,10 +16,14 @@ const Users = () => {
     nombre: '',
     email: '',
     rut: '',
-    rol: 'usuario'
+    rol: 'CLIENTE',
+    clave: '123456', // Clave por defecto
+    telefono: 0 // Teléfono por defecto
   });
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
+  // Datos estáticos para el historial (por ahora)
   const historialClientes = {
     1: [ 
       {
@@ -76,43 +78,64 @@ const Users = () => {
     ]
   };
 
-  
-  const cargarUsuarios = () => {
-    const usuariosGuardados = localStorage.getItem('usuarios');
-    if (usuariosGuardados) {
-      return JSON.parse(usuariosGuardados);
+  const cargarUsuarios = async () => {
+    try {
+      setLoading(true);
+      const data = await DataService.getUsuarios();
+      console.log("Usuarios cargados:", data);
+      setUsers(data);
+      setFilteredUsers(data);
+    } catch (error) {
+      console.error("Error al cargar usuarios:", error);
+      alert("Error al cargar usuarios: " + error.message);
+    } finally {
+      setLoading(false);
     }
-    return usuariosIniciales;
-  };
-
-  
-  const guardarUsuarios = (usuarios) => {
-    localStorage.setItem('usuarios', JSON.stringify(usuarios));
   };
 
   useEffect(() => {
-    const usuarios = cargarUsuarios();
-    setUsers(usuarios);
-    setFilteredUsers(usuarios);
+    cargarUsuarios();
   }, []);
 
   useEffect(() => {
-    if (searchTerm === '') {
-      setFilteredUsers(users);
-    } else {
-      const filtered = users.filter(user => 
-        user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.rut.includes(searchTerm)
+    let filtered = users;
+
+    // Filtro por búsqueda
+    if (searchTerm) {
+      filtered = filtered.filter(user => 
+        (user.nombreCompleto || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.correo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.rut || '').includes(searchTerm)
       );
-      setFilteredUsers(filtered);
     }
+
+    // Filtro por rol
+    if (roleFilter !== 'todos') {
+      filtered = filtered.filter(user => 
+        (user.rol || '').toLowerCase() === roleFilter.toLowerCase()
+      );
+    }
+
+    // Ordenamiento
+    filtered = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'nombre':
+          return (a.nombreCompleto || '').localeCompare(b.nombreCompleto || '');
+        case 'email':
+          return (a.correo || '').localeCompare(b.correo || '');
+        case 'rol':
+          return (a.rol || '').localeCompare(b.rol || '');
+        case 'id':
+        default:
+          return (a.usuId || 0) - (b.usuId || 0);
+      }
+    });
+
+    setFilteredUsers(filtered);
   }, [searchTerm, roleFilter, sortBy, users]);
 
-  
   const validarRUT = (rut) => {
     if (!rut) return false;
-    
     
     const rutLimpio = rut.replace(/[^0-9kK]/g, '');
     if (rutLimpio.length < 2) return false;
@@ -120,7 +143,6 @@ const Users = () => {
     const cuerpo = rutLimpio.slice(0, -1);
     const dv = rutLimpio.slice(-1).toUpperCase();
 
-    
     let suma = 0;
     let multiplo = 2;
 
@@ -136,43 +158,43 @@ const Users = () => {
   };
 
   const validarEmail = (email) => {
-    const dominiosPermitidos = ['@duocuc.cl', '@fondaduoc.cl'];
+    const dominiosPermitidos = ['@duocuc.cl', '@fondaduoc.cl', '@gmail.com'];
     return dominiosPermitidos.some(dominio => email.endsWith(dominio));
   };
 
   const validarFormulario = () => {
-  const nuevosErrores = {};
+    const nuevosErrores = {};
 
-  if (!formData.nombre.trim()) {
-    nuevosErrores.nombre = 'El nombre es obligatorio';
-  } else if (formData.nombre.trim().length < 3) {
-    nuevosErrores.nombre = 'El nombre debe tener al menos 3 caracteres';
-  }
+    if (!formData.nombre.trim()) {
+      nuevosErrores.nombre = 'El nombre es obligatorio';
+    } else if (formData.nombre.trim().length < 3) {
+      nuevosErrores.nombre = 'El nombre debe tener al menos 3 caracteres';
+    }
 
-  if (!formData.email.trim()) {
-    nuevosErrores.email = 'El email es obligatorio';
-  } else if (!validarEmail(formData.email)) {
-    nuevosErrores.email = 'El email debe terminar en @duocuc.cl o @fondaduoc.cl';
-  }
+    if (!formData.email.trim()) {
+      nuevosErrores.email = 'El email es obligatorio';
+    } else if (!validarEmail(formData.email)) {
+      nuevosErrores.email = 'El email debe terminar en @duocuc.cl o @fondaduoc.cl';
+    }
 
-  
-  if (showAddModal && !formData.rut.trim()) {
-    nuevosErrores.rut = 'El RUT es obligatorio';
-  } else if (showAddModal && !validarRUT(formData.rut)) {
-    nuevosErrores.rut = 'El RUT no es válido';
-  }
+    if (showAddModal && !formData.rut.trim()) {
+      nuevosErrores.rut = 'El RUT es obligatorio';
+    } else if (showAddModal && !validarRUT(formData.rut)) {
+      nuevosErrores.rut = 'El RUT no es válido';
+    }
 
-  setErrors(nuevosErrores);
-  return Object.keys(nuevosErrores).length === 0;
-};
+    setErrors(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  };
 
-  
   const handleOpenAddModal = () => {
     setFormData({
       nombre: '',
       email: '',
       rut: '',
-      rol: 'usuario'
+      rol: 'CLIENTE',
+      clave: '123456', 
+      telefono: 0 
     });
     setErrors({});
     setShowAddModal(true);
@@ -180,11 +202,16 @@ const Users = () => {
 
   const handleOpenEditModal = (user) => {
     setSelectedUser(user);
+    
+    let roleValue = (user.rol || 'CLIENTE').toUpperCase();
+    
     setFormData({
-      nombre: user.nombre,
-      email: user.email,
-      rut: user.rut,
-      rol: user.rol
+      nombre: user.nombreCompleto || '',
+      email: user.correo || '',
+      rut: user.rut || '',
+      rol: roleValue,
+      clave: user.clave || '123456', 
+      telefono: user.telefono || 0 
     });
     setErrors({});
     setShowEditModal(true);
@@ -205,7 +232,7 @@ const Users = () => {
 
   const getHistorialUsuario = () => {
     if (!selectedUser) return [];
-    return historialClientes[selectedUser.id_usuario] || [];
+    return historialClientes[selectedUser.usuId] || [];
   };
 
   const formatFecha = (fecha) => {
@@ -260,7 +287,6 @@ const Users = () => {
       [field]: value
     }));
     
-    
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -268,56 +294,98 @@ const Users = () => {
       }));
     }
   };
-  
 
-  const handleFormSubmit = (e) => {
-  e.preventDefault();
-  
-  if (!validarFormulario()) return;
-
-  if (showAddModal) {
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
     
-    const nuevoUsuario = {
-      id_usuario: Math.max(...users.map(u => u.id_usuario), 0) + 1,
-      nombre: formData.nombre.trim(),
-      email: formData.email.trim().toLowerCase(),
-      rut: formData.rut,
-      rol: formData.rol
-    };
+    if (!validarFormulario()) return;
 
-    const updatedUsers = [...users, nuevoUsuario];
-    setUsers(updatedUsers);
-    guardarUsuarios(updatedUsers);
-  } else if (showEditModal && selectedUser) {
-    
-    const updatedUsers = users.map(user =>
-      user.id_usuario === selectedUser.id_usuario
-        ? { 
-            ...user, 
-            nombre: formData.nombre.trim(),
-            email: formData.email.trim().toLowerCase(),
-            rol: formData.rol 
-          }
-        : user
-    );
-    setUsers(updatedUsers);
-    guardarUsuarios(updatedUsers);
-  }
+    try {
+      setLoading(true);
 
-  handleCloseModals();
-};
+      if (showAddModal) {
+        // Preparar datos para crear usuario - CON TODOS LOS CAMPOS REQUERIDOS
+        const nuevoUsuario = {
+          nombreCompleto: formData.nombre.trim(),
+          correo: formData.email.trim().toLowerCase(),
+          rut: formData.rut.replace(/[^0-9kK]/g, ''), // RUT limpio
+          rol: formData.rol.toUpperCase(),
+          clave: formData.clave, // Clave por defecto
+          telefono: formData.telefono // Teléfono por defecto
+        };
 
-  const handleDeleteUser = (id) => {
-    const user = users.find(u => u.id_usuario === id);
-    if (user.rol === 'admin') {
+        console.log("Enviando datos para crear usuario:", nuevoUsuario);
+        await DataService.addUsuario(nuevoUsuario);
+        alert('Usuario creado exitosamente');
+      } else if (showEditModal && selectedUser) {
+        // Preparar datos para actualizar usuario - SOLO CAMPOS EDITABLES
+        const usuarioActualizado = {
+          usuId: selectedUser.usuId,
+          nombreCompleto: formData.nombre.trim(),
+          correo: formData.email.trim().toLowerCase(),
+          rol: formData.rol.toUpperCase()
+          // No enviar rut, clave ni teléfono para no modificarlos
+        };
+
+        console.log("Enviando datos para actualizar usuario:", usuarioActualizado);
+        await DataService.updateUsuario(usuarioActualizado);
+        alert('Usuario actualizado exitosamente');
+      }
+
+      await cargarUsuarios();
+      handleCloseModals();
+    } catch (error) {
+      console.error("Error al guardar usuario:", error);
+      
+      let errorMessage = "Error al guardar usuario. ";
+      
+      if (error.message.includes("500")) {
+        errorMessage += "Error interno del servidor. Verifica la consola del backend.";
+      } else if (error.message.includes("409")) {
+        errorMessage += "El usuario ya existe (email o RUT duplicado).";
+      } else {
+        errorMessage += error.message;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };  
+
+  const handleDeleteUser = async (id) => {
+    const user = users.find(u => u.usuId === id);
+    if (!user) return;
+
+    if ((user.rol || '').toUpperCase() === 'ADMIN') {
       alert('No se puede eliminar al administrador principal');
       return;
     }
 
-    if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario "${user.nombre}"?`)) {
-      const updatedUsers = users.filter(user => user.id_usuario !== id);
-      setUsers(updatedUsers);
-      guardarUsuarios(updatedUsers);
+    if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario "${user.nombreCompleto}"?\nEsta acción no se puede deshacer.`)) {
+      try {
+        setLoading(true);
+        console.log("Eliminando usuario con ID:", id);
+        await DataService.deleteUsuario(id);
+        alert('Usuario eliminado exitosamente');
+        await cargarUsuarios();
+      } catch (error) {
+        console.error("Error al eliminar usuario:", error);
+        
+        let errorMessage = "Error al eliminar usuario. ";
+        
+        if (error.message.includes("500")) {
+          errorMessage += "Error interno del servidor. El usuario podría tener datos relacionados que impiden su eliminación.";
+        } else if (error.message.includes("404")) {
+          errorMessage += "Usuario no encontrado.";
+        } else {
+          errorMessage += error.message;
+        }
+        
+        alert(errorMessage);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -327,36 +395,15 @@ const Users = () => {
     setSortBy('id');
   };
 
-  const resetToDefault = () => {
-    if (window.confirm('¿Restaurar lista de usuarios a los valores por defecto?')) {
-      setUsers(usuariosIniciales);
-      guardarUsuarios(usuariosIniciales);
-    }
-  };
-
-  
   const formatearRUT = (rut) => {
-    
+    if (!rut) return '';
     const rutLimpio = rut.replace(/[^0-9kK]/g, '');
-    
-    if (rutLimpio.length === 0) return '';
-    
+    if (rutLimpio.length <= 1) return rutLimpio;
     
     const cuerpo = rutLimpio.slice(0, -1);
     const dv = rutLimpio.slice(-1).toUpperCase();
     
-    
-    let cuerpoFormateado = cuerpo
-      .split('')
-      .reverse()
-      .join('')
-      .replace(/(\d{3})/g, '$1.')
-      .split('')
-      .reverse()
-      .join('')
-      .replace(/^\./, '');
-    
-    return cuerpoFormateado + '-' + dv;
+    return `${cuerpo}-${dv}`;
   };
 
   const handleRUTChange = (value) => {
@@ -364,43 +411,46 @@ const Users = () => {
     handleFormChange('rut', rutFormateado);
   };
 
-  useEffect(() => {
-  let filtered = users;
-
-  
-  if (searchTerm) {
-    filtered = filtered.filter(user => 
-      user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.rut.includes(searchTerm)
-    );
-  }
-
-  
-  if (roleFilter !== 'todos') {
-    filtered = filtered.filter(user => user.rol === roleFilter);
-  }
-
-  
-  filtered = [...filtered].sort((a, b) => {
-    switch (sortBy) {
-      case 'nombre':
-        return a.nombre.localeCompare(b.nombre);
-      case 'email':
-        return a.email.localeCompare(b.email);
-      case 'rol':
-        return a.rol.localeCompare(b.rol);
-      case 'id':
+  const getRolTexto = (rol) => {  
+    const rolUpper = (rol || '').toUpperCase();
+    switch (rolUpper) {
+      case 'ADMIN':
+        return 'Administrador';
+      case 'VENDEDOR':
+        return 'Vendedor';
+      case 'CLIENTE':
+        return 'Cliente';
       default:
-        return a.id_usuario - b.id_usuario;
+        return rol || 'Cliente';
     }
-  });
+  };
 
-  setFilteredUsers(filtered);
-}, [searchTerm, roleFilter, sortBy, users]);
+  const getRolColor = (rol) => {
+    const rolUpper = (rol || '').toUpperCase();
+    switch (rolUpper) {
+      case 'ADMIN':
+        return 'bg-danger';
+      case 'VENDEDOR':
+        return 'bg-warning text-dark';
+      case 'CLIENTE':
+        return 'bg-primary';
+      default:
+        return 'bg-secondary';
+    }
+  };
 
   return (
     <div className="container-fluid" style={{ position: 'relative', zIndex: 2 }}>
+      {/* Loading overlay */}
+      {loading && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
+             style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999 }}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      )}
+
       {/* Filtros avanzados */}
       <div className="row mb-4">
         <div className="col-12">
@@ -438,7 +488,8 @@ const Users = () => {
                   >
                     <option value="todos">Todos los roles</option>
                     <option value="admin">Administrador</option>
-                    <option value="usuario">Usuario</option>
+                    <option value="vendedor">Vendedor</option>
+                    <option value="cliente">Cliente</option>
                   </select>
                 </div>
 
@@ -464,6 +515,7 @@ const Users = () => {
                       className="btn btn-outline-secondary flex-fill"
                       onClick={clearFilters}
                       title="Limpiar filtros"
+                      disabled={loading}
                     >
                       <i className="bi bi-arrow-clockwise"></i>
                     </button>
@@ -471,6 +523,7 @@ const Users = () => {
                       className="btn btn-primary flex-fill"
                       onClick={handleOpenAddModal}
                       title="Agregar usuario"
+                      disabled={loading}
                     >
                       <i className="bi bi-plus-lg"></i>
                     </button>
@@ -478,7 +531,7 @@ const Users = () => {
                 </div>
               </div>
 
-              {/* Contador de resultados y botón reset */}
+              {/* Contador de resultados */}
               <div className="row mt-3">
                 <div className="col-12">
                   <div className="d-flex justify-content-between align-items-center">
@@ -492,17 +545,11 @@ const Users = () => {
                         <button 
                           className="btn btn-sm btn-link text-muted p-0"
                           onClick={clearFilters}
+                          disabled={loading}
                         >
                           Limpiar filtros
                         </button>
                       )}
-                      <button 
-                        className="btn btn-sm btn-outline-warning"
-                        onClick={resetToDefault}
-                        title="Restaurar usuarios por defecto"
-                      >
-                        <i className="bi bi-arrow-counterclockwise"></i> Restaurar
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -539,6 +586,7 @@ const Users = () => {
                         className="btn-close btn-close-white ms-1"
                         style={{ fontSize: '0.6rem' }}
                         onClick={() => setRoleFilter('todos')}
+                        disabled={loading}
                       ></button>
                     </span>
                   )}
@@ -549,6 +597,7 @@ const Users = () => {
                         className="btn-close ms-1"
                         style={{ fontSize: '0.6rem' }}
                         onClick={() => setSearchTerm('')}
+                        disabled={loading}
                       ></button>
                     </span>
                   )}
@@ -578,21 +627,21 @@ const Users = () => {
                 <tbody>
                   {filteredUsers.length > 0 ? (
                     filteredUsers.map(user => (
-                      <tr key={user.id_usuario} style={{ 
+                      <tr key={user.usuId} style={{ 
                         backgroundColor: 'rgba(255,255,255,0.8)',
                         transition: 'background-color 0.2s ease'
                       }}>
-                        <td style={{ border: 'none', padding: '12px 16px', color: '#666' }}>{user.id_usuario}</td>
-                        <td style={{ border: 'none', padding: '12px 16px', color: '#333', fontWeight: '500' }}>{user.nombre}</td>
-                        <td style={{ border: 'none', padding: '12px 16px', color: '#666' }}>{user.email}</td>
-                        <td style={{ border: 'none', padding: '12px 16px', color: '#666' }}>{user.rut}</td>
+                        <td style={{ border: 'none', padding: '12px 16px', color: '#666' }}>{user.usuId}</td>
+                        <td style={{ border: 'none', padding: '12px 16px', color: '#333', fontWeight: '500' }}>{user.nombreCompleto}</td>
+                        <td style={{ border: 'none', padding: '12px 16px', color: '#666' }}>{user.correo}</td>
+                        <td style={{ border: 'none', padding: '12px 16px', color: '#666' }}>{formatearRUT(user.rut)}</td>
                         <td style={{ border: 'none', padding: '12px 16px' }}>
-                          <span className={`badge ${user.rol === 'admin' ? 'bg-danger' : 'bg-primary'}`} style={{ 
+                          <span className={`badge ${getRolColor(user.rol)}`} style={{ 
                             fontSize: '0.75em',
                             padding: '0.4em 0.8em',
                             fontWeight: '500'
                           }}>
-                            {user.rol === 'admin' ? 'Administrador' : 'Usuario'}
+                            {getRolTexto(user.rol)}
                           </span>
                         </td>
                         <td style={{ border: 'none', padding: '12px 16px', textAlign: 'center' }}>
@@ -601,6 +650,7 @@ const Users = () => {
                               className="btn btn-sm btn-outline-info"
                               onClick={() => handleOpenHistorialModal(user)}
                               title="Ver historial"
+                              disabled={loading}
                               style={{ 
                                 border: '1px solid #0dcaf0',
                                 borderRadius: '4px',
@@ -613,6 +663,7 @@ const Users = () => {
                               className="btn btn-sm btn-outline-primary"
                               onClick={() => handleOpenEditModal(user)}
                               title="Editar usuario"
+                              disabled={loading}
                               style={{ 
                                 border: '1px solid #007bff',
                                 borderRadius: '4px',
@@ -623,14 +674,14 @@ const Users = () => {
                             </button>
                             <button 
                               className="btn btn-sm btn-outline-danger"
-                              onClick={() => handleDeleteUser(user.id_usuario)}
-                              disabled={user.rol === 'admin'}
-                              title={user.rol === 'admin' ? 'No se puede eliminar al administrador principal' : 'Eliminar usuario'}
+                              onClick={() => handleDeleteUser(user.usuId)}
+                              disabled={loading || (user.rol || '').toUpperCase() === 'ADMIN'}
+                              title={(user.rol || '').toUpperCase() === 'ADMIN' ? 'No se puede eliminar al administrador principal' : 'Eliminar usuario'}
                               style={{ 
                                 border: '1px solid #dc3545',
                                 borderRadius: '4px',
                                 padding: '0.25rem 0.5rem',
-                                opacity: user.rol === 'admin' ? 0.5 : 1
+                                opacity: (user.rol || '').toUpperCase() === 'ADMIN' ? 0.5 : 1
                               }}
                             >
                               <i className="bi bi-trash"></i>
@@ -655,42 +706,283 @@ const Users = () => {
         </div>
       </div>
 
-      {/* Modal de Historial del Cliente */}
+      {/* Modal Agregar Usuario */}
+      {showAddModal && (
+        <>
+          <div className="modal-backdrop show"></div>
+          <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header bg-primary text-white">
+                  <h5 className="modal-title">
+                    <i className="bi bi-person-plus me-2"></i>
+                    Agregar Nuevo Usuario
+                  </h5>
+                  <button 
+                    type="button" 
+                    className="btn-close btn-close-white" 
+                    onClick={handleCloseModals}
+                    disabled={loading}
+                  ></button>
+                </div>
+                <form onSubmit={handleFormSubmit}>
+                  <div className="modal-body">
+                    <div className="alert alert-info">
+                      <small>
+                        <i className="bi bi-info-circle me-1"></i>
+                        Se asignará una clave por defecto y teléfono 0 automáticamente
+                      </small>
+                    </div>
+                    
+                    <div className="row g-3">
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Nombre Completo *</label>
+                        <input
+                          type="text"
+                          className={`form-control ${errors.nombre ? 'is-invalid' : ''}`}
+                          value={formData.nombre}
+                          onChange={(e) => handleFormChange('nombre', e.target.value)}
+                          placeholder="Ingrese nombre completo"
+                          disabled={loading}
+                        />
+                        {errors.nombre && (
+                          <div className="invalid-feedback">
+                            {errors.nombre}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Email *</label>
+                        <input
+                          type="email"
+                          className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                          value={formData.email}
+                          onChange={(e) => handleFormChange('email', e.target.value)}
+                          placeholder="usuario@gmail.com o usuario@duocuc.cl"
+                          disabled={loading}
+                        />
+                        {errors.email && (
+                          <div className="invalid-feedback">
+                            {errors.email}
+                          </div>
+                        )}
+                        <div className="form-text">Debe terminar en @duocuc.cl, @fondaduoc.cl o @gmail.com</div>
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">RUT *</label>
+                        <input
+                          type="text"
+                          className={`form-control ${errors.rut ? 'is-invalid' : ''}`}
+                          value={formData.rut}
+                          onChange={(e) => handleRUTChange(e.target.value)}
+                          placeholder="12345678-9"
+                          maxLength="12"
+                          disabled={loading}
+                        />
+                        {errors.rut && (
+                          <div className="invalid-feedback">
+                            {errors.rut}
+                          </div>
+                        )}
+                        <div className="form-text">Formato: 12345678-9 (sin puntos)</div>
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Rol *</label>
+                        <select
+                          className="form-select"
+                          value={formData.rol}
+                          onChange={(e) => handleFormChange('rol', e.target.value)}
+                          disabled={loading}
+                        >
+                          <option value="CLIENTE">Cliente</option>
+                          <option value="VENDEDOR">Vendedor</option>
+                          <option value="ADMIN">Administrador</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary" 
+                      onClick={handleCloseModals}
+                      disabled={loading}
+                    >
+                      <i className="bi bi-x-circle me-1"></i> Cancelar
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1" role="status"></span>
+                          Creando...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check-circle me-1"></i> Crear Usuario
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal Editar Usuario - ACTUALIZADO */}
+      {showEditModal && selectedUser && (
+        <>
+          <div className="modal-backdrop show"></div>
+          <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-content">
+                <div className="modal-header bg-warning text-dark">
+                  <h5 className="modal-title">
+                    <i className="bi bi-person-gear me-2"></i>
+                    Editar Usuario: {selectedUser.nombreCompleto}
+                  </h5>
+                  <button 
+                    type="button" 
+                    className="btn-close" 
+                    onClick={handleCloseModals}
+                    disabled={loading}
+                  ></button>
+                </div>
+                <form onSubmit={handleFormSubmit}>
+                  <div className="modal-body">
+                    <div className="alert alert-info">
+                      <div className="row small">
+                        <div className="col-6">
+                          <strong>ID Usuario:</strong> {selectedUser.usuId}
+                        </div>
+                        <div className="col-6">
+                          <strong>RUT:</strong> {selectedUser.rut}
+                        </div>
+                      </div>
+                      <div className="row small mt-2">
+                        <div className="col-6">
+                          <strong>Teléfono:</strong> {selectedUser.telefono || 'No asignado'}
+                        </div>
+                        <div className="col-6">
+                          <strong>Rol actual:</strong> 
+                          <span className={`badge ${getRolColor(selectedUser.rol)} ms-1`}>
+                            {getRolTexto(selectedUser.rol)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="row g-3">
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Nombre Completo *</label>
+                        <input
+                          type="text"
+                          className={`form-control ${errors.nombre ? 'is-invalid' : ''}`}
+                          value={formData.nombre}
+                          onChange={(e) => handleFormChange('nombre', e.target.value)}
+                          placeholder="Ingrese nombre completo"
+                          disabled={loading}
+                        />
+                        {errors.nombre && (
+                          <div className="invalid-feedback">
+                            {errors.nombre}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Email *</label>
+                        <input
+                          type="email"
+                          className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                          value={formData.email}
+                          onChange={(e) => handleFormChange('email', e.target.value)}
+                          placeholder="usuario@duocuc.cl"
+                          disabled={loading}
+                        />
+                        {errors.email && (
+                          <div className="invalid-feedback">
+                            {errors.email}
+                          </div>
+                        )}
+                        <div className="form-text">Debe terminar en @duocuc.cl, @fondaduoc.cl o @gmail.com</div>
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">Rol *</label>
+                        <select
+                          className="form-select"
+                          value={formData.rol}
+                          onChange={(e) => handleFormChange('rol', e.target.value)}
+                          disabled={loading}
+                        >
+                          <option value="CLIENTE">Cliente</option>
+                          <option value="VENDEDOR">Vendedor</option>
+                          <option value="ADMIN">Administrador</option>
+                        </select>
+                        <div className="form-text">
+                          {(selectedUser.rol || '').toUpperCase() !== formData.rol && (
+                            <span className="text-warning">
+                              <i className="bi bi-exclamation-triangle me-1"></i> 
+                              Se cambiará el rol del usuario de "{getRolTexto(selectedUser.rol)}" a "{getRolTexto(formData.rol)}"
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary" 
+                      onClick={handleCloseModals}
+                      disabled={loading}
+                    >
+                      <i className="bi bi-x-circle me-1"></i> Cancelar
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn btn-warning"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1" role="status"></span>
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check-circle me-1"></i> Guardar Cambios
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal Historial (se mantiene igual que antes) */}
       {showHistorialModal && selectedUser && (
         <>
-          {/* Backdrop */}
-          <div 
-            className="modal-backdrop show" 
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              zIndex: 1050
-            }}
-          ></div>
-          
-          {/* Modal */}
-          <div 
-            className="modal show d-block" 
-            tabIndex="-1" 
-            style={{ 
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              zIndex: 1060,
-              overflow: 'hidden'
-            }}
-          >
+          <div className="modal-backdrop show"></div>
+          <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1060 }}>
             <div className="modal-dialog modal-dialog-centered modal-lg">
               <div className="modal-content">
                 <div className="modal-header bg-info text-white">
                   <h5 className="modal-title">
                     <i className="bi bi-clock-history me-2"></i>
-                    Historial del Cliente: {selectedUser.nombre}
+                    Historial del Cliente: {selectedUser.nombreCompleto}
                   </h5>
                   <button 
                     type="button" 
@@ -699,18 +991,20 @@ const Users = () => {
                   ></button>
                 </div>
                 <div className="modal-body">
-                  {/* Información del cliente */}
+                  {/* Contenido del historial (igual que antes) */}
                   <div className="row mb-4">
                     <div className="col-md-6">
                       <div className="card bg-light">
                         <div className="card-body">
                           <h6 className="card-title">Información del Cliente</h6>
-                          <p className="mb-1"><strong>Nombre:</strong> {selectedUser.nombre}</p>
-                          <p className="mb-1"><strong>Email:</strong> {selectedUser.email}</p>
+                          <p className="mb-1"><strong>Nombre:</strong> {selectedUser.nombreCompleto}</p>
+                          <p className="mb-1"><strong>Email:</strong> {selectedUser.correo}</p>
                           <p className="mb-1"><strong>RUT:</strong> {selectedUser.rut}</p>
-                          <p className="mb-0"><strong>Rol:</strong> <span className={`badge ${selectedUser.rol === 'admin' ? 'bg-danger' : 'bg-primary'}`}>
-                            {selectedUser.rol === 'admin' ? 'Administrador' : 'Usuario'}
-                          </span></p>
+                          <p className="mb-0"><strong>Rol:</strong> 
+                            <span className={`badge ${getRolColor(selectedUser.rol)} ms-1`}>
+                              {getRolTexto(selectedUser.rol)}
+                            </span>
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -726,7 +1020,6 @@ const Users = () => {
                     </div>
                   </div>
 
-                  {/* Lista de historial */}
                   <h6 className="mb-3">Historial de Actividades</h6>
                   {getHistorialUsuario().length > 0 ? (
                     <div className="list-group">
@@ -758,7 +1051,6 @@ const Users = () => {
                                 </small>
                               </div>
                               
-                              {/* Items del historial */}
                               {historial.items && historial.items.length > 0 && (
                                 <div className="mt-2">
                                   <small className="text-muted">
@@ -787,329 +1079,12 @@ const Users = () => {
                   >
                     <i className="bi bi-x-circle me-1"></i> Cerrar
                   </button>
-                  <button 
-                    type="button" 
-                    className="btn btn-outline-primary"
-                    onClick={() => {
-                      
-                      alert(`Exportando historial de ${selectedUser.nombre}...`);
-                    }}
-                  >
-                    <i className="bi bi-download me-1"></i> Exportar Historial
-                  </button>
                 </div>
               </div>
             </div>
           </div>
         </>
       )}
-
-      {/* Modal Agregar Usuario */}
-{showAddModal && (
-  <>
-    {/* Backdrop con animación */}
-    <div 
-      className="modal-backdrop show modal-backdrop-animation" 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 1050
-      }}
-    ></div>
-    
-    {/* Modal con animación */}
-    <div 
-      className="modal show d-block modal-show" 
-      tabIndex="-1" 
-      style={{ 
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 1060,
-        overflow: 'hidden'
-      }}
-    >
-      <div className="modal-dialog modal-dialog-centered modal-animation">
-        <div className="modal-content">
-          <div className="modal-header bg-primary text-white">
-            <h5 className="modal-title">
-              <i className="bi bi-person-plus me-2"></i>
-              Agregar Nuevo Usuario
-            </h5>
-            <button 
-              type="button" 
-              className="btn-close btn-close-white" 
-              onClick={handleCloseModals}
-              style={{ transition: 'transform 0.2s ease' }}
-              onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
-              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-            ></button>
-          </div>
-          <form onSubmit={handleFormSubmit}>
-            <div className="modal-body">
-              <div className="row g-3">
-                <div className="col-12">
-                  <label className="form-label fw-semibold">Nombre Completo *</label>
-                  <input
-                    type="text"
-                    className={`form-control ${errors.nombre ? 'is-invalid' : ''}`}
-                    value={formData.nombre}
-                    onChange={(e) => handleFormChange('nombre', e.target.value)}
-                    placeholder="Ingrese nombre completo"
-                    style={{ transition: 'all 0.2s ease' }}
-                  />
-                  {errors.nombre && (
-                    <div className="invalid-feedback animate__animated animate__fadeIn">
-                      {errors.nombre}
-                    </div>
-                  )}
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label fw-semibold">Email *</label>
-                  <input
-                    type="email"
-                    className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                    value={formData.email}
-                    onChange={(e) => handleFormChange('email', e.target.value)}
-                    placeholder="usuario@duocuc.cl"
-                    style={{ transition: 'all 0.2s ease' }}
-                  />
-                  {errors.email && (
-                    <div className="invalid-feedback animate__animated animate__fadeIn">
-                      {errors.email}
-                    </div>
-                  )}
-                  <div className="form-text">Debe terminar en @duocuc.cl o @fondaduoc.cl</div>
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label fw-semibold">RUT *</label>
-                  <input
-                    type="text"
-                    className={`form-control ${errors.rut ? 'is-invalid' : ''}`}
-                    value={formData.rut}
-                    onChange={(e) => handleRUTChange(e.target.value)}
-                    placeholder="12.345.678-9"
-                    maxLength="12"
-                    style={{ transition: 'all 0.2s ease' }}
-                  />
-                  {errors.rut && (
-                    <div className="invalid-feedback animate__animated animate__fadeIn">
-                      {errors.rut}
-                    </div>
-                  )}
-                  <div className="form-text">Formato: 12.345.678-9</div>
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label fw-semibold">Rol *</label>
-                  <select
-                    className="form-select"
-                    value={formData.rol}
-                    onChange={(e) => handleFormChange('rol', e.target.value)}
-                    style={{ transition: 'all 0.2s ease' }}
-                  >
-                    <option value="usuario">Usuario</option>
-                    <option value="admin">Administrador</option>
-                  </select>
-                  <div className="form-text">Los administradores tienen acceso completo al sistema</div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button 
-                type="button" 
-                className="btn btn-secondary btn-pulse" 
-                onClick={handleCloseModals}
-                style={{ transition: 'all 0.3s ease' }}
-              >
-                <i className="bi bi-x-circle me-1"></i> Cancelar
-              </button>
-              <button 
-                type="submit" 
-                className="btn btn-primary btn-pulse"
-                style={{ transition: 'all 0.3s ease' }}
-              >
-                <i className="bi bi-check-circle me-1"></i> Crear Usuario
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </>
-)}
-
-{/* Modal Editar Usuario con Animaciones */}
-{showEditModal && selectedUser && (
-  <>
-    {/* Backdrop con animación */}
-    <div 
-      className="modal-backdrop show modal-backdrop-animation" 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 1050
-      }}
-    ></div>
-    
-    {/* Modal con animación */}
-    <div 
-      className="modal show d-block modal-show" 
-      tabIndex="-1" 
-      style={{ 
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: 1060,
-        overflow: 'hidden'
-      }}
-    >
-      <div className="modal-dialog modal-dialog-centered modal-animation">
-        <div className="modal-content">
-          <div className="modal-header bg-warning text-dark">
-            <h5 className="modal-title">
-              <i className="bi bi-person-gear me-2"></i>
-              Editar Usuario: {selectedUser.nombre}
-            </h5>
-            <button 
-              type="button" 
-              className="btn-close" 
-              onClick={handleCloseModals}
-              style={{ transition: 'transform 0.2s ease' }}
-              onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
-              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-            ></button>
-          </div>
-          <form onSubmit={handleFormSubmit}>
-            <div className="modal-body">
-              {/* Información del usuario actual */}
-              <div className="alert alert-info" style={{ animation: 'slideDown 0.4s ease-out' }}>
-                <div className="row small">
-                  <div className="col-6">
-                    <strong>ID Usuario:</strong> {selectedUser.id_usuario}
-                  </div>
-                  <div className="col-6">
-                    <strong>Rol actual:</strong> 
-                    <span className={`badge ${selectedUser.rol === 'admin' ? 'bg-danger' : 'bg-primary'} ms-1`}>
-                      {selectedUser.rol === 'admin' ? 'Administrador' : 'Usuario'}
-                    </span>
-                  </div>
-                </div>
-                <div className="row small mt-2">
-                  <div className="col-12">
-                    <strong>RUT:</strong> {selectedUser.rut}
-                  </div>
-                </div>
-              </div>
-
-              <div className="row g-3">
-                <div className="col-12">
-                  <label className="form-label fw-semibold">Nombre Completo *</label>
-                  <input
-                    type="text"
-                    className={`form-control ${errors.nombre ? 'is-invalid' : ''}`}
-                    value={formData.nombre}
-                    onChange={(e) => handleFormChange('nombre', e.target.value)}
-                    placeholder="Ingrese nombre completo"
-                    style={{ transition: 'all 0.2s ease' }}
-                  />
-                  {errors.nombre && (
-                    <div className="invalid-feedback animate__animated animate__fadeIn">
-                      {errors.nombre}
-                    </div>
-                  )}
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label fw-semibold">Email *</label>
-                  <input
-                    type="email"
-                    className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                    value={formData.email}
-                    onChange={(e) => handleFormChange('email', e.target.value)}
-                    placeholder="usuario@duocuc.cl"
-                    style={{ transition: 'all 0.2s ease' }}
-                  />
-                  {errors.email && (
-                    <div className="invalid-feedback animate__animated animate__fadeIn">
-                      {errors.email}
-                    </div>
-                  )}
-                  <div className="form-text">Debe terminar en @duocuc.cl o @fondaduoc.cl</div>
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label fw-semibold">RUT (No editable)</label>
-                  <input
-                    type="text"
-                    className="form-control bg-light"
-                    value={selectedUser.rut}
-                    disabled
-                    style={{ cursor: 'not-allowed', opacity: 0.7 }}
-                  />
-                  <div className="form-text text-muted">
-                    <i className="bi bi-info-circle me-1"></i>
-                    El RUT no puede ser modificado por seguridad
-                  </div>
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label fw-semibold">Rol *</label>
-                  <select
-                    className="form-select"
-                    value={formData.rol}
-                    onChange={(e) => handleFormChange('rol', e.target.value)}
-                    style={{ transition: 'all 0.2s ease' }}
-                  >
-                    <option value="usuario">Usuario</option>
-                    <option value="admin">Administrador</option>
-                  </select>
-                  <div className="form-text">
-                    {selectedUser.rol !== formData.rol && (
-                      <span className="text-warning animate__animated animate__pulse">
-                        <i className="bi bi-exclamation-triangle me-1"></i> 
-                        Se cambiará el rol del usuario de "{selectedUser.rol}" a "{formData.rol}"
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button 
-                type="button" 
-                className="btn btn-secondary btn-pulse" 
-                onClick={handleCloseModals}
-                style={{ transition: 'all 0.3s ease' }}
-              >
-                <i className="bi bi-x-circle me-1"></i> Cancelar
-              </button>
-              <button 
-                type="submit" 
-                className="btn btn-warning btn-pulse"
-                style={{ transition: 'all 0.3s ease' }}
-              >
-                <i className="bi bi-check-circle me-1"></i> Guardar Cambios
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </>
-)}
     </div>
   );
 };
