@@ -1,42 +1,41 @@
-import { loadFromLocalstorage, removeFromLocalstorage } from "../utils/localstorageHelper";
+import { removeFromLocalstorage } from "../utils/localstorageHelper";
 import { useNavigate } from "react-router-dom";
 
-function Pago_logrado() {
+function PagoLogrado() {
   const navigate = useNavigate();
 
-  
-  const pago = loadFromLocalstorage("pagos");
-
-  if (!pago) return <p>No se encontró información del pago.</p>;
-
-  const handleSalir = () => {
-    removeFromLocalstorage("pagos"); 
+  // Limpiar carrito y pagos del localstorage
+  const handleInicio = () => {
     removeFromLocalstorage("compra");
-    navigate("/"); 
+    removeFromLocalstorage("pagos");
+    navigate("/"); // Ir a inicio
+  };
+
+  const handleProductos = () => {
+    removeFromLocalstorage("pagos");
+    navigate("/productos"); // Ir a productos
   };
 
   return (
     <div className="container-fluid bg-info min-vh-100 d-flex align-items-center justify-content-center">
       <div className="col-md-6 bg-light p-4 rounded shadow text-center">
-        <h1 className="mb-4">Pago Logrado</h1>
+        <h1 className="mb-4">¡Pago Realizado con Éxito!</h1>
 
-        <div className="text-start mb-3">
-          <p><strong>RUT:</strong> {pago.rut}</p>
-          <p><strong>Nombre:</strong> {pago.nombre}</p>
-          <p><strong>Número de Tarjeta:</strong> {pago.numero_tarjeta}</p>
-          <p><strong>Fecha de Vencimiento:</strong> {pago.fecha}</p>
+        <div className="alert alert-success mt-3" role="alert">
+          Tu pago se ha procesado correctamente. ¡Gracias por tu compra!
         </div>
 
-        <div className="alert alert-success mt-4" role="alert">
-          El pago se logro realizar.
+        <div className="d-flex justify-content-around mt-4">
+          <button className="btn btn-primary" onClick={handleInicio}>
+            Ir al Inicio
+          </button>
+          <button className="btn btn-success" onClick={handleProductos}>
+            Ver Productos
+          </button>
         </div>
-        <button className="btn btn-primary mt-4" onClick={handleSalir}>
-          Salir
-        </button>
       </div>
     </div>
   );
 }
 
-export default Pago_logrado;
-
+export default PagoLogrado;

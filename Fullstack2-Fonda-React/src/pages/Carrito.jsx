@@ -6,6 +6,10 @@ import {
 } from "../utils/localstorageHelper";
 import { useNavigate } from "react-router-dom";
 
+// 👉 Import PayPal button
+import { PayPalButtons } from "@paypal/react-paypal-js";
+
+
 function Carrito() {
   const [carrito, setCarrito] = useState([]);
   const navigate = useNavigate();
@@ -65,6 +69,10 @@ function Carrito() {
   const totalConDescuento = tieneDescuentoDuoc
     ? totalSinDescuento * 0.8
     : totalSinDescuento;
+
+  // 👉 PayPal no acepta CLP, así que convertimos un CLP a USD aprox
+  const totalUSD = (totalConDescuento / 950).toFixed(2); 
+  // puedes ajustar el valor del dólar más tarde
 
   return (
     <div
@@ -166,16 +174,40 @@ function Carrito() {
                 <strong>{totalConDescuento.toLocaleString("es-CL")} CLP</strong>
               </h3>
 
+              <h5>Total en USD para PayPal: <strong>${totalUSD}</strong></h5>
+
               <button className="btn btn-danger" onClick={vaciarCarrito}>
                 Vaciar carrito
               </button>
 
-              <button
-                className="btn btn-success m-4"
-                onClick={() => navigate("/SimulacionPago")}
-              >
-                Comprar
-              </button>
+              <div className="mt-4">
+                <h4>Pagar con PayPal</h4>
+
+                {/* 👉 BOTÓN PAYPAL AQUÍ */}
+                <PayPalButtons
+                  style={{ layout: "vertical", color: "blue", shape: "rect" }}
+                  createOrder={(data, actions) => {
+                    return actions.order.create({
+                      purchase_units: [
+                        {
+                          amount: {
+                            value: totalUSD,
+                            currency_code: "USD",
+                          },
+                        },
+                      ],
+                    });
+                  }}
+                  onApprove={(data, actions) => {
+                    return actions.order.capture().then((details) => {
+                      console.log("DETALLES DEL PAGO:", details);
+                      navigate("/pago_logrado");
+                    });
+                  }}
+                  onCancel={() => navigate("/pago_fallido")}
+                  onError={() => navigate("/pago_fallido")}
+                />
+              </div>
             </>
           )
         ) : (

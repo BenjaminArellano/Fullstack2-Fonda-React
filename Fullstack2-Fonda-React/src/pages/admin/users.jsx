@@ -158,7 +158,7 @@ const Users = () => {
   };
 
   const validarEmail = (email) => {
-    const dominiosPermitidos = ['@duocuc.cl', '@fondaduoc.cl', '@gmail.com'];
+    const dominiosPermitidos = ['@duocuc.cl', '@fondaduoc.cl', '@gmail.com','@vendedor.cl'];
     return dominiosPermitidos.some(dominio => email.endsWith(dominio));
   };
 
@@ -759,7 +759,7 @@ const Users = () => {
                           className={`form-control ${errors.email ? 'is-invalid' : ''}`}
                           value={formData.email}
                           onChange={(e) => handleFormChange('email', e.target.value)}
-                          placeholder="usuario@gmail.com o usuario@duocuc.cl"
+                        
                           disabled={loading}
                         />
                         {errors.email && (
@@ -767,7 +767,7 @@ const Users = () => {
                             {errors.email}
                           </div>
                         )}
-                        <div className="form-text">Debe terminar en @duocuc.cl, @fondaduoc.cl o @gmail.com</div>
+                        <div className="form-text">Debe terminar en @duocuc.cl, @fondaduoc.cl, @vendedor.cl o @gmail.com</div>
                       </div>
 
                       <div className="col-12">
