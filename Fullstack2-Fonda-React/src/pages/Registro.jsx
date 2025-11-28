@@ -68,17 +68,14 @@ function Registro() {
       rol
     };
 
-    console.log("Usuario listo para enviar:", nuevoUsuario);
 
     // ---- PETICIÓN AL SERVIDOR (SPRING BOOT) ----
     try {
       const respuesta = await DataService.addUsuario(nuevoUsuario);
-      console.log("Respuesta del servidor:", respuesta);
 
       alert("Usuario registrado correctamente en el servidor");
       navigate("/Login");
     } catch (error) {
-      console.error("Error al registrar usuario:", error);
       alert("Error al conectar con el servidor");
     }
   };

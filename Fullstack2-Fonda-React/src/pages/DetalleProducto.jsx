@@ -1,14 +1,22 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import DataService from "../utils/DataService";
-import { loadFromLocalstorage, saveToLocalstorage } from "../utils/localstorageHelper";
+import {
+  loadFromLocalstorage,
+  saveToLocalstorage,
+} from "../utils/localstorageHelper";
 
 function DetalleProducto() {
-  const { id } = useParams(); // <-- El ID que viene desde la URL
+  const { id } = useParams();
   const [producto, setProducto] = useState(null);
   const [cargando, setCargando] = useState(true);
 
-  
+  // 🔹 Traer usuario logueado
+  const usuarioLogueado = loadFromLocalstorage("usuarioLogueado");
+
+  // 🔹 Validar si es vendedor
+  const esVendedor =
+    usuarioLogueado?.correo?.toLowerCase().endsWith("@vendedor.cl") ?? false;
 
   useEffect(() => {
     if (!id) {
@@ -79,11 +87,22 @@ function DetalleProducto() {
           />
         )}
 
-        <div className="mt-4">
-          <button className="btn btn-success" onClick={agregarAlCarrito}>
-            Añadir al carrito
-          </button>
-        </div>
+        {!esVendedor && (
+          <div className="mt-4">
+            <button className="btn btn-success" onClick={agregarAlCarrito}>
+              Añadir al carrito
+            </button>
+          </div>
+        )}
+
+        {/* 🔹 SI ES VENDEDOR → mostrar mensaje */}
+        {esVendedor && (
+          <div className="mt-4">
+            <span className="text-danger fw-bold">
+              Los vendedores no pueden comprar productos.
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

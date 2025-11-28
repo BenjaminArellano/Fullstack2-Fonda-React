@@ -47,19 +47,18 @@ function Carrito() {
     }
   };
 
-  // =====================================================
-  // 🔥 DETECCIÓN DE DESCUENTO DUOC UC
-  // =====================================================
   const tieneDescuentoDuoc = usuario?.correo
     ?.toLowerCase()
     .trim()
     .endsWith("@duocuc.cl");
 
-  // =====================================================
-  // 🔥 CÁLCULO DE TOTAL
-  // =====================================================
   const totalSinDescuento = carrito.reduce((acum, prod) => {
-    const precio = prod.precio ?? prod.precioProd;
+    const precio =
+      prod.precio ??
+      prod.precioProd ??
+      prod.precioOferta ??
+      0;
+
     return acum + precio * prod.cantidad;
   }, 0);
 
@@ -82,25 +81,38 @@ function Carrito() {
 
         {token ? (
           carrito.length === 0 ? (
-            <p className="mt-4">Tu carrito está vacío 😢</p>
+            <p className="mt-4">Tu carrito está vacío</p>
           ) : (
             <>
               <ul className="list-group mb-4">
                 {carrito.map((producto, index) => {
-                  const precio = producto.precio ?? producto.precioProd;
+                  const precio =
+                    producto.precio ??
+                    producto.precioProd ??
+                    producto.precioOferta ??
+                    0;
+
+                  const nombre =
+                    producto.nombreProducto ||
+                    producto.nombreOferta ||
+                    producto.nombre ||
+                    "Producto";
+
+                  const id =
+                    producto.prodId ||
+                    producto.ofertaId ||
+                    index;
 
                   return (
                     <li
-                      key={producto.prodId || index}
+                      key={id}
                       className="list-group-item d-flex justify-content-between align-items-center"
                     >
                       <div>
-                        <strong>
-                          {producto.nombreProducto || producto.nombre}
-                        </strong>
+                        <strong>{nombre}</strong>
                         <br />
                         <small>
-                          {precio.toLocaleString("es-CL")} CLP x{" "}
+                          {Number(precio).toLocaleString("es-CL")} CLP x{" "}
                           {producto.cantidad}
                         </small>
 
@@ -122,14 +134,13 @@ function Carrito() {
 
                       <span>
                         Subtotal:{" "}
-                        {(precio * producto.cantidad).toLocaleString("es-CL")}{" "}
-                        CLP
+                        {(precio * producto.cantidad).toLocaleString("es-CL")} CLP
                       </span>
 
                       {producto.imagen && (
                         <img
                           src={producto.imagen}
-                          alt={producto.nombreProducto}
+                          alt={nombre}
                           style={{ width: "60px", borderRadius: "8px" }}
                         />
                       )}
@@ -138,21 +149,18 @@ function Carrito() {
                 })}
               </ul>
 
-              {/* DESCUENTO DUOC */}
               {tieneDescuentoDuoc && (
                 <div className="alert alert-success">
                   Descuento DUOC UC aplicado: -20%
                 </div>
               )}
 
-              {/* 🔥 TOTAL ORIGINAL (solo si tiene descuento) */}
               {tieneDescuentoDuoc && (
                 <h4 style={{ color: "gray", textDecoration: "line-through" }}>
                   Total original: {totalSinDescuento.toLocaleString("es-CL")} CLP
                 </h4>
               )}
 
-              {/* 🔥 TOTAL FINAL */}
               <h3 className="mb-3">
                 Total a pagar:{" "}
                 <strong>{totalConDescuento.toLocaleString("es-CL")} CLP</strong>
@@ -173,8 +181,13 @@ function Carrito() {
         ) : (
           <div>
             <h2>Debe iniciar sesión para poder ingresar al carrito</h2>
-            <p className="text-center">Presione el botón para ir a iniciar sesión</p>
-            <button className="btn btn-primary" onClick={() => navigate("/login")}>
+            <p className="text-center">
+              Presione el botón para ir a iniciar sesión
+            </p>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate("/login")}
+            >
               Ir a iniciar sesión
             </button>
           </div>

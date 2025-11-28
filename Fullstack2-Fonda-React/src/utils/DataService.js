@@ -231,8 +231,17 @@ const DataService = {
   deleteDetalleBoleta: async (id) => {
     const res = await fetch(`${BASE_URL}/eliminarDetalleBoleta/${id}`, { method: "DELETE" });
     return handleResponse(res);
-  }
+  },
 
+  // =================== OFERTAS (NUEVO) ===================
+  getOfertas: async () => {
+    const res = await fetch(`${BASE_URL}/ofertas`);
+    return handleResponse(res);
+  },
+  getOfertaById: async (id) => {
+  const res = await fetch(`${BASE_URL}/ofertaById/${id}`);
+  return handleResponse(res);
+}
 };
 
 export default DataService;

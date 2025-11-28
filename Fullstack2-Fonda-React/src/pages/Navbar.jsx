@@ -3,6 +3,7 @@ import { loadFromLocalstorage, removeFromLocalstorage } from "../utils/localstor
 
 function Navbar() {
   const token = loadFromLocalstorage("token");
+  const usuario = loadFromLocalstorage("usuarioLogueado");
   const navigate = useNavigate();
 
   const cerrarSesion = () => {
@@ -12,13 +13,17 @@ function Navbar() {
     navigate("/login");
   };
 
+
+  const esVendedor = usuario?.correo?.toLowerCase().endsWith("@vendedor.cl");
+
   return (
-    <nav className="navbar navbar-expand-lg navbar-light"
+    <nav
+      className="navbar navbar-expand-lg navbar-light"
       style={{ backgroundColor: "white", border: "4px solid grey" }}
     >
       <div className="container">
 
-        {/* 🔹 LOGO */}
+
         <Link className="navbar-brand" to="/">
           <img
             src="../src/assets/logo.png"
@@ -27,7 +32,6 @@ function Navbar() {
           />
         </Link>
 
-        {/* 🔹 BOTÓN HAMBURGUESA */}
         <button
           className="navbar-toggler"
           type="button"
@@ -40,34 +44,49 @@ function Navbar() {
           <span className="navbar-toggler-icon"></span>
         </button>
 
-        {/* 🔹 CONTENIDO COLAPSABLE */}
+
         <div className="collapse navbar-collapse" id="navbarContent">
           <ul className="navbar-nav ms-auto">
 
-            <li className="nav-item"><Link className="nav-link" to="/">Inicio</Link></li>
-            <li className="nav-item"><Link className="nav-link" to="/productos">Productos</Link></li>
-            <li className="nav-item"><Link className="nav-link" to="/categorias">Categorias</Link></li>
-            <li className="nav-item"><Link className="nav-link" to="/ofertas">Ofertas</Link></li>
-            <li className="nav-item"><Link className="nav-link" to="/carrito">Carrito</Link></li>
-            <li className="nav-item"><Link className="nav-link" to="/blog">Blog</Link></li>
-            <li className="nav-item"><Link className="nav-link" to="/contacto">Contacto</Link></li>
-            <li className="nav-item"><Link className="nav-link" to="/nosotros">Nosotros</Link></li>
 
-            {/* 🔹 SIN TOKEN → Login + Registro */}
-            {!token && (
+            {esVendedor ? (
               <>
-                <li className="nav-item"><Link className="nav-link" to="/login">Login</Link></li>
-                <li className="nav-item"><Link className="nav-link" to="/registro">Registro</Link></li>
-              </>
-            )}
+                <li className="nav-item">
+                  <Link className="nav-link" to="/productos">Productos</Link>
+                </li>
 
-            {/* 🔹 CON TOKEN → Cerrar sesión */}
-            {token && (
-              <li className="nav-item">
-                <button className="btn btn-link nav-link text-danger" onClick={cerrarSesion}>
-                  Cerrar sesión
-                </button>
-              </li>
+                <li className="nav-item">
+                  <button className="btn btn-link nav-link text-danger" onClick={cerrarSesion}>
+                    Cerrar sesión
+                  </button>
+                </li>
+              </>
+            ) : (
+              <>
+                <li className="nav-item"><Link className="nav-link" to="/">Inicio</Link></li>
+                <li className="nav-item"><Link className="nav-link" to="/productos">Productos</Link></li>
+                <li className="nav-item"><Link className="nav-link" to="/categorias">Categorias</Link></li>
+                <li className="nav-item"><Link className="nav-link" to="/ofertas">Ofertas</Link></li>
+                <li className="nav-item"><Link className="nav-link" to="/carrito">Carrito</Link></li>
+                <li className="nav-item"><Link className="nav-link" to="/blog">Blog</Link></li>
+                <li className="nav-item"><Link className="nav-link" to="/contacto">Contacto</Link></li>
+                <li className="nav-item"><Link className="nav-link" to="/nosotros">Nosotros</Link></li>
+
+                {!token && (
+                  <>
+                    <li className="nav-item"><Link className="nav-link" to="/login">Login</Link></li>
+                    <li className="nav-item"><Link className="nav-link" to="/registro">Registro</Link></li>
+                  </>
+                )}
+
+                {token && (
+                  <li className="nav-item">
+                    <button className="btn btn-link nav-link text-danger" onClick={cerrarSesion}>
+                      Cerrar sesión
+                    </button>
+                  </li>
+                )}
+              </>
             )}
 
           </ul>

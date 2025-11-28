@@ -7,23 +7,22 @@ function Categorias() {
   const [categorias, setCategorias] = useState([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("");
 
-  // Cargar CATEGORÍAS desde DataService
+  // Cargar categorías
   useEffect(() => {
     DataService.getCategorias()
       .then((data) => setCategorias(data))
       .catch((err) => console.error("Error cargando categorías:", err));
   }, []);
 
-  // Cargar PRODUCTOS desde DataService
+  // Cargar productos
   useEffect(() => {
     DataService.getProductos()
       .then((data) => setProductos(data))
-      .catch((err) => console.error(" Error cargando productos:", err));
+      .catch((err) => console.error("Error cargando productos:", err));
   }, []);
 
   return (
     <div className="container mt-3">
-
       <h1 className="text-center">Categorías</h1>
 
       {/* Select Categorías */}
@@ -38,10 +37,7 @@ function Categorias() {
           <option value="">Todas</option>
 
           {categorias.map((cat) => (
-            <option
-              key={cat.id || cat.catId}
-              value={cat.id || cat.catId}
-            >
+            <option key={cat.catId ?? cat.id} value={cat.catId ?? cat.id}>
               {cat.nombre}
             </option>
           ))}
@@ -51,20 +47,23 @@ function Categorias() {
       {/* Productos filtrados */}
       <div className="row">
         {productos
-          .filter(
-            (p) =>
-              categoriaSeleccionada === "" ||
-              p.categoria?.id === Number(categoriaSeleccionada) ||
-              p.categoria?.catId === Number(categoriaSeleccionada)
-          )
+          .filter((p) => {
+            if (!categoriaSeleccionada) return true;
+            const catId = Number(categoriaSeleccionada);
+            return (
+              (p.categoria && (p.categoria.catId === catId || p.categoria.id === catId))
+            );
+          })
           .map((producto) => (
-            <div className="col" key={producto.id}>
+            <div className="col-md-4 mb-3" key={producto.prodId}>
               <Producto
-                codigo={producto.id}
-                nombre={producto.nombre}
-                precio={producto.precio}
+                codigo={producto.prodId}
+                nombre={producto.nombreProducto}
+                precio={producto.precioProd}
+                moneda={producto.moneda}
                 imagen={producto.imagen}
                 categoria={producto.categoria?.nombre}
+                detalle={producto.detalleProd}
               />
             </div>
           ))}

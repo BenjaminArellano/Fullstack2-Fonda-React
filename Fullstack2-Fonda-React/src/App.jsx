@@ -49,7 +49,7 @@ function App() {
                 <Route path='/pago_logrado' element={<PagoLogrado/>} />
                 <Route path='/pago_fallido' element={<PagoFallido/>} />
                 <Route path='/ofertas' element={<Oferta/>} />
-                <Route path='/oferta/:codigo' element={<DetalleOferta/>} />
+                <Route path='/oferta/:id' element={<DetalleOferta/>} />
                 <Route path='/carrito' element={<Carrito/>} />
                 <Route path="/simulacionPago" element={<SimulacionPago/>} />
                 <Route path='/blog' element={<Blog/>} />
