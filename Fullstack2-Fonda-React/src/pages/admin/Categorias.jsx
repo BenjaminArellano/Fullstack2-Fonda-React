@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import DataService from '../../utils/DataService'; // Importar DataService
 
 const merchandisingBandas = '/src/assets/admin/merchandising-bandas.webp';
 const vestimentaHuasa = '/src/assets/admin/VestimentaHuaso.jpg';
@@ -14,10 +15,10 @@ const Categorias = () => {
   const [filteredProductos, setFilteredProductos] = useState([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('todas');
   const [showCategoriaModal, setShowCategoriaModal] = useState(false);
-  const [nuevaCategoria, setNuevaCategoria] = useState('');
+  const [nuevaCategoria, setNuevaCategoria] = useState({ nombre: '' });
   const [categoriaError, setCategoriaError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  
   const imagenesCategorias = {
     'Merchandising de Bandas': merchandisingBandas,
     'Vestimenta Huasa': vestimentaHuasa,
@@ -26,111 +27,144 @@ const Categorias = () => {
     'Entradas': entradas
   };
 
-  
-  const getImagenCategoria = (categoria) => {
-    return imagenesCategorias[categoria] || imagenDefault;
+  const getImagenCategoria = (categoriaNombre) => {
+    return imagenesCategorias[categoriaNombre] || imagenDefault;
   };
 
-  
-  const cargarCategorias = () => {
-    const categoriasGuardadas = localStorage.getItem('categorias');
-    if (categoriasGuardadas) {
-      const categoriasCargadas = JSON.parse(categoriasGuardadas);
-      
-      
-      categoriasCargadas.forEach(categoria => {
-        if (!imagenesCategorias[categoria]) {
-          imagenesCategorias[categoria] = imagenDefault;
-        }
-      });
-      
-      return categoriasCargadas;
+  // Cargar categorías desde el backend
+  const cargarCategorias = async () => {
+    try {
+      setLoading(true);
+      // NOTA: Necesitarás crear estos endpoints en tu backend
+      const data = await DataService.getCategorias();
+      console.log("Categorías cargadas:", data);
+      setCategorias(data);
+    } catch (error) {
+      console.error("Error al cargar categorías:", error);
+      // Si falla, usar categorías por defecto
+      const categoriasPorDefecto = [
+        { catId: 1, nombre: 'Merchandising de Bandas' },
+        { catId: 2, nombre: 'Vestimenta Huasa' },
+        { catId: 3, nombre: 'Pañuelos de Cueca' },
+        { catId: 4, nombre: 'Tickets de Consumo' },
+        { catId: 5, nombre: 'Entradas' }
+      ];
+      setCategorias(categoriasPorDefecto);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar productos desde el backend
+  const cargarProductos = async () => {
+    try {
+      const data = await DataService.getProductos();
+      console.log("Productos cargados:", data);
+      setProductos(data);
+      setFilteredProductos(data);
+    } catch (error) {
+      console.error("Error al cargar productos:", error);
+      alert("Error al cargar productos: " + error.message);
+    }
+  };
+
+  // Agregar nueva categoría al backend
+  const handleAgregarCategoria = async () => {
+  if (!nuevaCategoria.nombre.trim()) {
+    setCategoriaError('El nombre de la categoría es obligatorio');
+    return;
+  }
+
+  // Validar si ya existe localmente
+  if (categorias.some(cat => cat.nombre.toLowerCase() === nuevaCategoria.nombre.trim().toLowerCase())) {
+    setCategoriaError('Esta categoría ya existe');
+    return;
+  }
+
+  try {
+    setLoading(true);
+    const categoriaData = {
+      nombre: nuevaCategoria.nombre.trim()
+    };
+
+    console.log("Creando categoría:", categoriaData);
+    const categoriaCreada = await DataService.addCategoria(categoriaData);
+    
+    // Actualizar lista de categorías
+    const nuevasCategorias = [...categorias, categoriaCreada];
+    setCategorias(nuevasCategorias);
+    
+    setNuevaCategoria({ nombre: '' });
+    setCategoriaError('');
+    setShowCategoriaModal(false);
+    alert('Categoría creada exitosamente');
+  } catch (error) {
+    console.error("Error completo al crear categoría:", error);
+    
+    let errorMessage = "Error al crear categoría";
+    if (error.response) {
+      // El servidor respondió con un código de error
+      errorMessage += `: ${error.response.status} - ${error.response.data?.message || error.response.data}`;
+    } else if (error.request) {
+      // La petición fue hecha pero no se recibió respuesta
+      errorMessage += ": No se pudo conectar al servidor";
+    } else {
+      // Algo pasó al configurar la petición
+      errorMessage += `: ${error.message}`;
     }
     
-    return ['Merchandising de Bandas', 'Vestimenta Huasa', 'Pañuelos de Cueca', 'Tickets de Consumo', 'Entradas'];
-  };
-
-  
-  const cargarProductos = () => {
-    const productosGuardados = localStorage.getItem('productos');
-    if (productosGuardados) {
-      return JSON.parse(productosGuardados);
-    }
-    return [];
-  };
-
-  
-  const guardarCategorias = (categoriasData) => {
-    localStorage.setItem('categorias', JSON.stringify(categoriasData));
-    
-    
-    categoriasData.forEach(categoria => {
-      if (!imagenesCategorias[categoria]) {
-        imagenesCategorias[categoria] = imagenDefault;
-      }
-    });
-  };
+    setCategoriaError(errorMessage);
+    alert(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
-    const categoriasData = cargarCategorias();
-    const productosData = cargarProductos();
-    setCategorias(categoriasData);
-    setProductos(productosData);
-    setFilteredProductos(productosData);
+    cargarCategorias();
+    cargarProductos();
   }, []);
 
   useEffect(() => {
     let filtered = productos;
 
     if (categoriaSeleccionada !== 'todas') {
-      filtered = productos.filter(producto => producto.categoria === categoriaSeleccionada);
+      filtered = productos.filter(producto => 
+        producto.categoria?.nombre === categoriaSeleccionada
+      );
     }
 
     setFilteredProductos(filtered);
   }, [categoriaSeleccionada, productos]);
 
-  
-  const handleAgregarCategoria = () => {
-    if (!nuevaCategoria.trim()) {
-      setCategoriaError('El nombre de la categoría es obligatorio');
-      return;
-    }
-
-    if (categorias.includes(nuevaCategoria.trim())) {
-      setCategoriaError('Esta categoría ya existe');
-      return;
-    }
-
-    const nuevasCategorias = [...categorias, nuevaCategoria.trim()];
-    setCategorias(nuevasCategorias);
-    guardarCategorias(nuevasCategorias);
-    
-    setNuevaCategoria('');
-    setCategoriaError('');
-    setShowCategoriaModal(false);
-  };
-
-  
-  const formatPrice = (price) => {
+  const formatPrice = (price, currency = 'CLP') => {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
-      currency: 'CLP'
+      currency: currency
     }).format(price);
   };
 
-  
-  const getProductosPorCategoria = (categoria) => {
-    return productos.filter(producto => producto.categoria === categoria);
+  const getProductosPorCategoria = (categoriaNombre) => {
+    return productos.filter(producto => producto.categoria?.nombre === categoriaNombre);
   };
 
-  
   const totalProductos = productos.length;
   const categoriasConProductos = categorias.filter(cat => 
-    productos.some(prod => prod.categoria === cat)
+    productos.some(prod => prod.categoria?.nombre === cat.nombre)
   ).length;
 
   return (
     <div className="container-fluid" style={{ position: 'relative', zIndex: 2 }}>
+      {/* Loading overlay */}
+      {loading && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
+             style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999 }}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      )}
+
       {/* Header y Estadísticas */}
       <div className="row mb-4">
         <div className="col-12">
@@ -146,6 +180,7 @@ const Categorias = () => {
               <button 
                 className="btn btn-primary"
                 onClick={() => setShowCategoriaModal(true)}
+                disabled={loading}
               >
                 <i className="bi bi-plus-lg me-1"></i> Nueva Categoría
               </button>
@@ -201,11 +236,12 @@ const Categorias = () => {
                     className="form-select"
                     value={categoriaSeleccionada}
                     onChange={(e) => setCategoriaSeleccionada(e.target.value)}
+                    disabled={loading}
                   >
                     <option value="todas">Todas las categorías</option>
                     {categorias.map(categoria => (
-                      <option key={categoria} value={categoria}>
-                        {categoria} ({getProductosPorCategoria(categoria).length})
+                      <option key={categoria.catId} value={categoria.nombre}>
+                        {categoria.nombre} ({getProductosPorCategoria(categoria.nombre).length})
                       </option>
                     ))}
                   </select>
@@ -225,100 +261,99 @@ const Categorias = () => {
       </div>
 
       {/* Grid de Productos */}
-<div className="row">
-  {filteredProductos.length > 0 ? (
-    filteredProductos.map(producto => (
-      <div key={producto.codigo} className="col-xl-3 col-lg-4 col-md-6 mb-4">
-        <div className="card h-100 shadow-sm" style={{ 
-          border: '1px solid rgba(0,0,0,0.1)',
-          borderRadius: '12px',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-        }}>
-          {/* Imagen con contenedor fijo */}
-          <div 
-            className="position-relative"
-            style={{
-              height: '200px',
-              overflow: 'hidden',
-              borderTopLeftRadius: '12px',
-              borderTopRightRadius: '12px'
-            }}
-          >
-            <img 
-              src={getImagenCategoria(producto.categoria)} 
-              alt={producto.categoria}
-              className="w-100 h-100"
-              style={{
-                objectFit: 'cover',
-                objectPosition: 'center'
-              }}
-              onError={(e) => {
-                e.target.src = imagenDefault;
-              }}
-            />
-          </div>
-          
-          <div className="card-body d-flex flex-column">
-            <div className="mb-2">
-              <span className="badge bg-primary bg-opacity-10 text-primary mb-2">
-                {producto.categoria}
-              </span>
-              <h6 className="card-title mb-2" style={{ color: '#333', fontWeight: '600' }}>
-                {producto.nombre}
-              </h6>
-              <p className="card-text text-muted small mb-2">
-                Código: {producto.codigo}
-              </p>
-            </div>
-            
-            <div className="mt-auto">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <span className="h5 mb-0 text-primary" style={{ fontWeight: '600' }}>
-                  {formatPrice(producto.precio)}
-                </span>
-                <span className={`badge ${
-                  producto.stock === 0 ? 'bg-danger' : 
-                  producto.stock <= producto.stockCritico ? 'bg-warning' : 'bg-success'
-                }`}>
-                  {producto.stock} en stock
-                </span>
-              </div>
-              
-              <div className="d-flex gap-2">
-                <Link 
-                  to="/admin/productos" 
-                  className="btn btn-outline-primary btn-sm flex-fill"
+      <div className="row">
+        {filteredProductos.length > 0 ? (
+          filteredProductos.map(producto => (
+            <div key={producto.prodId} className="col-xl-3 col-lg-4 col-md-6 mb-4">
+              <div className="card h-100 shadow-sm" style={{ 
+                border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: '12px',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+              }}>
+                {/* Imagen con contenedor fijo */}
+                <div 
+                  className="position-relative"
+                  style={{
+                    height: '200px',
+                    overflow: 'hidden',
+                    borderTopLeftRadius: '12px',
+                    borderTopRightRadius: '12px'
+                  }}
                 >
-                  <i className="bi bi-pencil me-1"></i> Editar
-                </Link>
-                <button className="btn btn-outline-secondary btn-sm">
-                  <i className="bi bi-eye"></i>
-                </button>
+                  <img 
+                    src={getImagenCategoria(producto.categoria?.nombre)} 
+                    alt={producto.categoria?.nombre}
+                    className="w-100 h-100"
+                    style={{
+                      objectFit: 'cover',
+                      objectPosition: 'center'
+                    }}
+                    onError={(e) => {
+                      e.target.src = imagenDefault;
+                    }}
+                  />
+                </div>
+                
+                <div className="card-body d-flex flex-column">
+                  <div className="mb-2">
+                    <span className="badge bg-primary bg-opacity-10 text-primary mb-2">
+                      {producto.categoria?.nombre || 'Sin categoría'}
+                    </span>
+                    <h6 className="card-title mb-2" style={{ color: '#333', fontWeight: '600' }}>
+                      {producto.nombreProducto}
+                    </h6>
+                    <p className="card-text text-muted small mb-2">
+                      ID: {producto.prodId}
+                    </p>
+                  </div>
+                  
+                  <div className="mt-auto">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <span className="h5 mb-0 text-primary" style={{ fontWeight: '600' }}>
+                        {formatPrice(producto.precioProd, producto.moneda)}
+                      </span>
+                      <span className={`badge ${
+                        producto.stock === 0 ? 'bg-danger' : 
+                        producto.stock <= producto.stockCritico ? 'bg-warning' : 'bg-success'
+                      }`}>
+                        {producto.stock} en stock
+                      </span>
+                    </div>
+                    
+                    <div className="d-flex gap-2">
+                      <Link 
+                        to="/admin/productos" 
+                        className="btn btn-outline-primary btn-sm flex-fill"
+                      >
+                        <i className="bi bi-pencil me-1"></i> Editar
+                      </Link>
+                      <button className="btn btn-outline-secondary btn-sm">
+                        <i className="bi bi-eye"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+          ))
+        ) : (
+          <div className="col-12">
+            <div className="text-center py-5">
+              <i className="bi bi-inboxes display-4 text-muted d-block mb-3"></i>
+              <h5 className="text-muted mb-2">No hay productos</h5>
+              <p className="text-muted mb-3">
+                {categoriaSeleccionada !== 'todas' 
+                  ? `No hay productos en la categoría "${categoriaSeleccionada}"`
+                  : 'No hay productos registrados en el sistema'
+                }
+              </p>
+              <Link to="/admin/productos" className="btn btn-primary">
+                <i className="bi bi-plus-circle me-1"></i> Agregar Productos
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-    ))
-  ) : (
-    <div className="col-12">
-      <div className="text-center py-5">
-        <i className="bi bi-inboxes display-4 text-muted d-block mb-3"></i>
-        <h5 className="text-muted mb-2">No hay productos</h5>
-        <p className="text-muted mb-3">
-          {categoriaSeleccionada !== 'todas' 
-            ? `No hay productos en la categoría "${categoriaSeleccionada}"`
-            : 'No hay productos registrados en el sistema'
-          }
-        </p>
-        <Link to="/admin/productos" className="btn btn-primary">
-          <i className="bi bi-plus-circle me-1"></i> Agregar Productos
-        </Link>
-      </div>
-    </div>
-  )}
-</div>
-
 
       {/* Vista de Categorías Vacías */}
       {categoriaSeleccionada === 'todas' && filteredProductos.length > 0 && (
@@ -331,37 +366,33 @@ const Categorias = () => {
           </div>
           
           {categorias.map(categoria => {
-            const productosCategoria = getProductosPorCategoria(categoria);
+            const productosCategoria = getProductosPorCategoria(categoria.nombre);
             if (productosCategoria.length === 0) return null;
             
             return (
-              <div key={categoria} className="col-12 mb-5">
+              <div key={categoria.catId} className="col-12 mb-5">
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <h5 style={{ color: '#333', fontWeight: '600' }}>
-                    {categoria} 
+                    {categoria.nombre} 
                     <span className="badge bg-primary ms-2">{productosCategoria.length}</span>
                   </h5>
                   <Link 
                     to="/admin/productos" 
                     className="btn btn-outline-primary btn-sm"
-                    onClick={() => {
-                      
-                      localStorage.setItem('categoriaFiltro', categoria);
-                    }}
                   >
                     Ver todos
                   </Link>
                 </div>
                 <div className="row">
                   {productosCategoria.slice(0, 4).map(producto => (
-                    <div key={producto.codigo} className="col-xl-3 col-lg-4 col-md-6 mb-3">
+                    <div key={producto.prodId} className="col-xl-3 col-lg-4 col-md-6 mb-3">
                       <div className="card h-100 shadow-sm" style={{ 
                         border: '1px solid rgba(0,0,0,0.1)',
                         borderRadius: '8px'
                       }}>
                         <img 
-                          src={getImagenCategoria(producto.categoria)} 
-                          alt={producto.categoria}
+                          src={getImagenCategoria(producto.categoria?.nombre)} 
+                          alt={producto.categoria?.nombre}
                           className="card-img-top"
                           style={{
                             height: '120px',
@@ -373,11 +404,11 @@ const Categorias = () => {
                         />
                         <div className="card-body">
                           <h6 className="card-title" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
-                            {producto.nombre}
+                            {producto.nombreProducto}
                           </h6>
                           <div className="d-flex justify-content-between align-items-center">
                             <span className="text-primary fw-bold" style={{ fontSize: '0.8rem' }}>
-                              {formatPrice(producto.precio)}
+                              {formatPrice(producto.precioProd, producto.moneda)}
                             </span>
                             <span className={`badge ${
                               producto.stock === 0 ? 'bg-danger' : 'bg-success'
@@ -405,67 +436,83 @@ const Categorias = () => {
 
       {/* Modal para Agregar Nueva Categoría */}
       {showCategoriaModal && (
-        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1090 }}>
-          <div className="modal-dialog modal-dialog-centered modal-sm">
-            <div className="modal-content">
-              <div className="modal-header bg-primary text-white">
-                <h5 className="modal-title">
-                  <i className="bi bi-tags me-2"></i>
-                  Nueva Categoría
-                </h5>
-                <button 
-                  type="button" 
-                  className="btn-close btn-close-white" 
-                  onClick={() => {
-                    setShowCategoriaModal(false);
-                    setNuevaCategoria('');
-                    setCategoriaError('');
-                  }}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Nombre de la categoría</label>
-                  <input
-                    type="text"
-                    className={`form-control ${categoriaError ? 'is-invalid' : ''}`}
-                    value={nuevaCategoria}
-                    onChange={(e) => {
-                      setNuevaCategoria(e.target.value);
-                      if (categoriaError) setCategoriaError('');
+        <>
+          <div className="modal-backdrop show"></div>
+          <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered modal-sm">
+              <div className="modal-content">
+                <div className="modal-header bg-primary text-white">
+                  <h5 className="modal-title">
+                    <i className="bi bi-tags me-2"></i>
+                    Nueva Categoría
+                  </h5>
+                  <button 
+                    type="button" 
+                    className="btn-close btn-close-white" 
+                    onClick={() => {
+                      setShowCategoriaModal(false);
+                      setNuevaCategoria({ nombre: '' });
+                      setCategoriaError('');
                     }}
-                    placeholder="Ej: Accesorios, Decoración..."
-                    autoFocus
-                  />
-                  {categoriaError && <div className="invalid-feedback">{categoriaError}</div>}
-                  <div className="form-text">
-                    La nueva categoría usará una imagen por defecto.
+                    disabled={loading}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <div className="mb-3">
+                    <label className="form-label fw-semibold">Nombre de la categoría</label>
+                    <input
+                      type="text"
+                      className={`form-control ${categoriaError ? 'is-invalid' : ''}`}
+                      value={nuevaCategoria.nombre}
+                      onChange={(e) => {
+                        setNuevaCategoria({ nombre: e.target.value });
+                        if (categoriaError) setCategoriaError('');
+                      }}
+                      placeholder="Ej: Accesorios, Decoración..."
+                      autoFocus
+                      disabled={loading}
+                    />
+                    {categoriaError && <div className="invalid-feedback">{categoriaError}</div>}
+                    <div className="form-text">
+                      La nueva categoría usará una imagen por defecto.
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => {
-                    setShowCategoriaModal(false);
-                    setNuevaCategoria('');
-                    setCategoriaError('');
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  onClick={handleAgregarCategoria}
-                >
-                  <i className="bi bi-check-lg me-1"></i> Crear Categoría
-                </button>
+                <div className="modal-footer">
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => {
+                      setShowCategoriaModal(false);
+                      setNuevaCategoria({ nombre: '' });
+                      setCategoriaError('');
+                    }}
+                    disabled={loading}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn btn-primary" 
+                    onClick={handleAgregarCategoria}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-1" role="status"></span>
+                        Creando...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-check-lg me-1"></i> Crear Categoría
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
