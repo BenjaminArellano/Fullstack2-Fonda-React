@@ -1,37 +1,106 @@
+import React from "react";
 import { removeFromLocalstorage } from "../utils/localstorageHelper";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 function PagoLogrado() {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Obtener datos de la boleta si existen
+  const boletaNumero = location.state?.boletaNumero || `B${Date.now()}`;
+  const total = location.state?.total;
+  const fecha = location.state?.fecha;
+  const detalles = location.state?.detalles || 0;
 
   // Limpiar carrito y pagos del localstorage
   const handleInicio = () => {
     removeFromLocalstorage("compra");
     removeFromLocalstorage("pagos");
-    navigate("/"); // Ir a inicio
+    navigate("/");
   };
 
   const handleProductos = () => {
     removeFromLocalstorage("pagos");
-    navigate("/productos"); // Ir a productos
+    navigate("/productos");
+  };
+
+  const handleMisCompras = () => {
+    navigate("/mis-compras");
   };
 
   return (
     <div className="container-fluid bg-info min-vh-100 d-flex align-items-center justify-content-center">
       <div className="col-md-6 bg-light p-4 rounded shadow text-center">
-        <h1 className="mb-4">¡Pago Realizado con Éxito!</h1>
-
-        <div className="alert alert-success mt-3" role="alert">
-          Tu pago se ha procesado correctamente. ¡Gracias por tu compra!
+        <div className="mb-4">
+          <div className="display-1 text-success mb-3">✅</div>
+          <h1 className="mb-3">¡Pago Realizado con Éxito! 🎉</h1>
+          <p className="lead text-muted">Tu compra ha sido procesada exitosamente</p>
         </div>
 
-        <div className="d-flex justify-content-around mt-4">
-          <button className="btn btn-primary" onClick={handleInicio}>
-            Ir al Inicio
+        {/* Información de la boleta */}
+        <div className="alert alert-info mt-3" role="alert">
+          <h5 className="alert-heading">📄 Detalles de tu Boleta</h5>
+          <hr />
+          <div className="text-start">
+            <p className="mb-2">
+              <strong>N° Boleta:</strong> 
+              <span className="badge bg-primary ms-2">{boletaNumero}</span>
+            </p>
+            <p className="mb-2">
+              <strong>Fecha:</strong> {fecha || new Date().toLocaleDateString('es-CL')}
+            </p>
+            <p className="mb-2">
+              <strong>Total Pagado:</strong> 
+              <span className="fw-bold text-success ms-2">
+                ${total?.toLocaleString("es-CL") || "0"} CLP
+              </span>
+            </p>
+            <p className="mb-2">
+              <strong>Productos:</strong> {detalles} item(s)
+            </p>
+            <p className="mb-0">
+              <strong>Estado:</strong> 
+              <span className="badge bg-success ms-2">Pagado ✓</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <p className="text-muted">
+            <strong>✅ Tu boleta ha sido registrada en nuestro sistema</strong>
+            <br />
+            <small>
+              Recibirás un correo de confirmación y podrás ver el historial 
+              de tus compas en la sección "Mis Compras".
+            </small>
+          </p>
+        </div>
+
+        <div className="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
+          <button className="btn btn-primary me-md-2" onClick={handleInicio}>
+            🏠 Ir al Inicio
           </button>
-          <button className="btn btn-success" onClick={handleProductos}>
-            Ver Productos
+          <button className="btn btn-success me-md-2" onClick={handleProductos}>
+            🛒 Seguir Comprando
           </button>
+          <button className="btn btn-outline-primary" onClick={handleMisCompras}>
+            📋 Ver Mis Compras
+          </button>
+        </div>
+
+        <div className="mt-4 p-3 bg-light rounded">
+          <h6>📧 ¿Qué sigue?</h6>
+          <small className="text-muted">
+            • Recibirás un correo de confirmación<br/>
+            • Tu boleta estará disponible en "Mis Compras"<br/>
+            • Los productos serán enviados según el método seleccionado
+          </small>
+        </div>
+
+        <div className="mt-4">
+          <small className="text-muted">
+            ¿Necesitas ayuda? <a href="/contacto" className="text-decoration-none">Contáctanos</a>
+          </small>
         </div>
       </div>
     </div>
