@@ -12,72 +12,20 @@ const Users = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showHistorialModal, setShowHistorialModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [historialUsuario, setHistorialUsuario] = useState([]);
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
     rut: '',
     rol: 'CLIENTE',
-    clave: '123456', // Clave por defecto
-    telefono: 0 // Teléfono por defecto
+    clave: '123456',
+    telefono: 0
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
 
-  // Datos estáticos para el historial (por ahora)
-  const historialClientes = {
-    1: [ 
-      {
-        id: 1,
-        tipo: 'compra',
-        descripcion: 'Compra realizada - Boleta B001',
-        fecha: new Date('2024-01-15T14:30:00'),
-        monto: 49956,
-        items: ['Polera Banda "Santaferia"', 'Entrada General Zona A'],
-        estado: 'completada'
-      },
-      {
-        id: 2,
-        tipo: 'consulta',
-        descripcion: 'Consulta sobre productos',
-        fecha: new Date('2024-01-10T11:20:00'),
-        monto: 0,
-        items: [],
-        estado: 'atendida'
-      }
-    ],
-    2: [
-      {
-        id: 1,
-        tipo: 'compra',
-        descripcion: 'Compra realizada - Boleta B002',
-        fecha: new Date('2024-01-14T16:45:00'),
-        monto: 42828,
-        items: ['Vale "Terremoto"', 'Pañuelo Bordado', 'Vale "Empanada"'],
-        estado: 'completada'
-      },
-      {
-        id: 2,
-        tipo: 'devolucion',
-        descripcion: 'Devolución parcial - Vale "Empanada"',
-        fecha: new Date('2024-01-13T09:15:00'),
-        monto: -3000,
-        items: ['Vale "Empanada"'],
-        estado: 'procesada'
-      }
-    ],
-    3: [
-      {
-        id: 1,
-        tipo: 'compra',
-        descripcion: 'Compra realizada - Boleta B003',
-        fecha: new Date('2024-01-14T11:20:00'),
-        monto: 77338,
-        items: ['Entrada VIP', 'Polera "Ráfaga"'],
-        estado: 'pendiente'
-      }
-    ]
-  };
-
+  // Cargar usuarios
   const cargarUsuarios = async () => {
     try {
       setLoading(true);
@@ -91,6 +39,61 @@ const Users = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Cargar historial real del usuario
+  const cargarHistorialUsuario = async (usuarioId) => {
+    try {
+      setLoadingHistorial(true);
+      console.log("🔄 Cargando historial para usuario ID:", usuarioId);
+      
+      // Obtener boletas del usuario desde el nuevo endpoint
+      const boletasUsuario = await DataService.getBoletasByUsuario(usuarioId);
+      console.log("📊 Boletas del usuario:", boletasUsuario);
+      
+      // Transformar boletas a historial
+      const historial = boletasUsuario.map(boleta => {
+        // Mapear estado de la boleta
+        const mapearEstado = (estado) => {
+          if (estado === 'PAGADA' || estado === 'Pagado') return 'completada';
+          return estado ? estado.toLowerCase() : 'pendiente';
+        };
+
+        return {
+          id: boleta.boletaId,
+          tipo: 'compra',
+          descripcion: `Compra realizada - ${boleta.numero || `Boleta ${boleta.boletaId}`}`,
+          fecha: new Date(boleta.fecha),
+          monto: boleta.total || 0,
+          items: [],
+          estado: mapearEstado(boleta.estado),
+          boletaId: boleta.boletaId,
+          numeroBoleta: boleta.numero,
+          cliente: boleta.cliente || 'Cliente no especificado'
+        };
+      });
+
+      // Ordenar por fecha (más reciente primero)
+      historial.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      
+      console.log("📋 Historial transformado:", historial);
+      setHistorialUsuario(historial);
+      
+    } catch (error) {
+      console.error("❌ Error al cargar historial:", error);
+      setHistorialUsuario([]);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
+  // Cuando abras el modal de historial
+  const handleOpenHistorialModal = async (user) => {
+    setSelectedUser(user);
+    setShowHistorialModal(true);
+    
+    // Cargar historial real del usuario
+    await cargarHistorialUsuario(user.usuId);
   };
 
   useEffect(() => {
@@ -217,39 +220,37 @@ const Users = () => {
     setShowEditModal(true);
   };
 
-  const handleOpenHistorialModal = (user) => {
-    setSelectedUser(user);
-    setShowHistorialModal(true);
-  };
-
   const handleCloseModals = () => {
     setShowAddModal(false);
     setShowEditModal(false);
     setShowHistorialModal(false);
     setSelectedUser(null);
+    setHistorialUsuario([]);
     setErrors({});
   };
 
-  const getHistorialUsuario = () => {
-    if (!selectedUser) return [];
-    return historialClientes[selectedUser.usuId] || [];
-  };
-
   const formatFecha = (fecha) => {
-    return new Intl.DateTimeFormat('es-CL', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(fecha);
+    if (!fecha) return 'Fecha no disponible';
+    
+    try {
+      const fechaObj = new Date(fecha);
+      return new Intl.DateTimeFormat('es-CL', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(fechaObj);
+    } catch (error) {
+      return 'Fecha inválida';
+    }
   };
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
       currency: 'CLP'
-    }).format(price);
+    }).format(price || 0);
   };
 
   const getIconoHistorial = (tipo) => {
@@ -354,40 +355,48 @@ const Users = () => {
   };  
 
   const handleDeleteUser = async (id) => {
-    const user = users.find(u => u.usuId === id);
-    if (!user) return;
+  const user = users.find(u => u.usuId === id);
+  if (!user) return;
 
-    if ((user.rol || '').toUpperCase() === 'ADMIN') {
-      alert('No se puede eliminar al administrador principal');
-      return;
-    }
+  if ((user.rol || '').toUpperCase() === 'ADMIN') {
+    alert('No se puede eliminar al administrador principal');
+    return;
+  }
 
-    if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario "${user.nombreCompleto}"?\nEsta acción no se puede deshacer.`)) {
-      try {
-        setLoading(true);
-        console.log("Eliminando usuario con ID:", id);
-        await DataService.deleteUsuario(id);
-        alert('Usuario eliminado exitosamente');
-        await cargarUsuarios();
-      } catch (error) {
-        console.error("Error al eliminar usuario:", error);
-        
-        let errorMessage = "Error al eliminar usuario. ";
-        
-        if (error.message.includes("500")) {
-          errorMessage += "Error interno del servidor. El usuario podría tener datos relacionados que impiden su eliminación.";
-        } else if (error.message.includes("404")) {
-          errorMessage += "Usuario no encontrado.";
-        } else {
-          errorMessage += error.message;
-        }
-        
-        alert(errorMessage);
-      } finally {
-        setLoading(false);
+  if (window.confirm(
+    `¿Estás seguro de que deseas eliminar al usuario "${user.nombreCompleto}"?\n\n` +
+    `⚠️  NOTA: Este usuario tiene registros relacionados (compras, boletas, etc.).\n`
+  )) {
+    try {
+      setLoading(true);
+      console.log("Eliminando usuario con ID:", id);
+      await DataService.deleteUsuarioCascada(id);
+      alert('Usuario eliminado exitosamente');
+      await cargarUsuarios();
+    } catch (error) {
+      console.error("Error al eliminar usuario:", error);
+      
+      // Manejar específicamente el error de restricción
+      if (error.message.includes('ORA-02292') || error.message.includes('restricción de integridad')) {
+        alert(
+          `No se puede eliminar el usuario "${user.nombreCompleto}"\n\n` +
+          `Motivo: El usuario tiene registros relacionados en el sistema (compras, boletas, etc.).\n\n` +
+          `Solución: Puedes:\n` +
+          `• Desactivar el usuario cambiando su estado\n` +
+          `• Contactar al administrador de la base de datos`
+        );
+      } else if (error.message.includes("500")) {
+        alert("Error interno del servidor. El usuario podría tener datos relacionados que impiden su eliminación.");
+      } else if (error.message.includes("404")) {
+        alert("Usuario no encontrado.");
+      } else {
+        alert("Error al eliminar usuario: " + error.message);
       }
+    } finally {
+      setLoading(false);
     }
-  };
+  }
+};
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -438,6 +447,23 @@ const Users = () => {
         return 'bg-secondary';
     }
   };
+
+  // Calcula estadísticas del historial
+  const calcularEstadisticasHistorial = () => {
+    const compras = historialUsuario.filter(h => h.tipo === 'compra');
+    const totalCompras = compras.length;
+    const totalGastado = compras.reduce((sum, compra) => sum + (compra.monto || 0), 0);
+    const comprasCompletadas = compras.filter(c => c.estado === 'completada').length;
+
+    return {
+      totalCompras,
+      totalGastado,
+      comprasCompletadas,
+      totalTransacciones: historialUsuario.length
+    };
+  };
+
+  const estadisticas = calcularEstadisticasHistorial();
 
   return (
     <div className="container-fluid" style={{ position: 'relative', zIndex: 2 }}>
@@ -982,82 +1008,135 @@ const Users = () => {
                 <div className="modal-header bg-info text-white">
                   <h5 className="modal-title">
                     <i className="bi bi-clock-history me-2"></i>
-                    Historial del Cliente: {selectedUser.nombreCompleto}
+                    Historial: {selectedUser.nombreCompleto}
                   </h5>
                   <button 
                     type="button" 
                     className="btn-close btn-close-white" 
                     onClick={handleCloseModals}
+                    disabled={loadingHistorial}
                   ></button>
                 </div>
-                <div className="modal-body">
-                  {/* Contenido del historial (igual que antes) */}
-                  <div className="row mb-4">
-                    <div className="col-md-6">
-                      <div className="card bg-light">
-                        <div className="card-body">
-                          <h6 className="card-title">Información del Cliente</h6>
-                          <p className="mb-1"><strong>Nombre:</strong> {selectedUser.nombreCompleto}</p>
-                          <p className="mb-1"><strong>Email:</strong> {selectedUser.correo}</p>
-                          <p className="mb-1"><strong>RUT:</strong> {selectedUser.rut}</p>
-                          <p className="mb-0"><strong>Rol:</strong> 
-                            <span className={`badge ${getRolColor(selectedUser.rol)} ms-1`}>
-                              {getRolTexto(selectedUser.rol)}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-md-6">
-                      <div className="card bg-light">
-                        <div className="card-body">
-                          <h6 className="card-title">Resumen de Actividad</h6>
-                          <p className="mb-1"><strong>Total de transacciones:</strong> {getHistorialUsuario().length}</p>
-                          <p className="mb-1"><strong>Compras realizadas:</strong> {getHistorialUsuario().filter(h => h.tipo === 'compra').length}</p>
-                          <p className="mb-0"><strong>Consultas:</strong> {getHistorialUsuario().filter(h => h.tipo === 'consulta').length}</p>
+                <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                  
+                  {/* Información compacta del cliente */}
+                  <div className="row mb-3">
+                    <div className="col-12">
+                      <div className="card border-0 bg-light">
+                        <div className="card-body py-2">
+                          <div className="row align-items-center">
+                            <div className="col-md-6">
+                              <p className="mb-1 small">
+                                <strong>Cliente:</strong> {selectedUser.nombreCompleto}
+                              </p>
+                              <p className="mb-0 small">
+                                <strong>RUT:</strong> {formatearRUT(selectedUser.rut)}
+                              </p>
+                            </div>
+                            <div className="col-md-6 text-md-end">
+                              <span className={`badge ${getRolColor(selectedUser.rol)} me-2`}>
+                                {getRolTexto(selectedUser.rol)}
+                              </span>
+                              <span className="badge bg-secondary">
+                                ID: {selectedUser.usuId}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <h6 className="mb-3">Historial de Actividades</h6>
-                  {getHistorialUsuario().length > 0 ? (
+                  {/* Estadísticas compactas */}
+                  <div className="row mb-3">
+                    <div className="col-6 col-sm-3 mb-2">
+                      <div className="card bg-primary text-white text-center">
+                        <div className="card-body py-2 px-1">
+                          <small className="card-title">Compras</small>
+                          <h6 className="mb-0">{estadisticas.totalCompras}</h6>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-6 col-sm-3 mb-2">
+                      <div className="card bg-success text-white text-center">
+                        <div className="card-body py-2 px-1">
+                          <small className="card-title">Total</small>
+                          <h6 className="mb-0">{formatPrice(estadisticas.totalGastado)}</h6>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-6 col-sm-3 mb-2">
+                      <div className="card bg-warning text-dark text-center">
+                        <div className="card-body py-2 px-1">
+                          <small className="card-title">Completadas</small>
+                          <h6 className="mb-0">{estadisticas.comprasCompletadas}</h6>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-6 col-sm-3 mb-2">
+                      <div className="card bg-info text-white text-center">
+                        <div className="card-body py-2 px-1">
+                          <small className="card-title">Transacciones</small>
+                          <h6 className="mb-0">{estadisticas.totalTransacciones}</h6>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lista de boletas - Versión compacta */}
+                  <div className="mb-3">
+                    <div className="d-flex justify-content-between align-items-center">
+                      <h6 className="mb-0">
+                        <i className="bi bi-receipt me-2"></i>
+                        Compras Realizadas
+                      </h6>
+                      {loadingHistorial && (
+                        <div className="spinner-border spinner-border-sm" role="status">
+                          <span className="visually-hidden">Cargando...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {historialUsuario.length > 0 ? (
                     <div className="list-group">
-                      {getHistorialUsuario().map(historial => (
-                        <div key={historial.id} className="list-group-item">
-                          <div className="d-flex align-items-start">
-                            <div className="flex-shrink-0 me-3">
-                              <i className={`bi ${getIconoHistorial(historial.tipo)}`} style={{ fontSize: '1.5rem' }}></i>
-                            </div>
+                      {historialUsuario.map((boleta) => (
+                        <div key={boleta.id} className="list-group-item py-2">
+                          <div className="d-flex justify-content-between align-items-start">
                             <div className="flex-grow-1">
-                              <div className="d-flex justify-content-between align-items-start mb-2">
-                                <div>
-                                  <h6 className="mb-1" style={{ color: '#333', fontWeight: '500' }}>
-                                    {historial.descripcion}
-                                  </h6>
-                                  <div className="d-flex align-items-center gap-2">
-                                    <span className={`badge bg-${getEstadoColor(historial.estado)}`}>
-                                      {historial.estado}
+                              <div className="d-flex flex-column flex-md-row justify-content-between align-items-start mb-1">
+                                <div className="mb-1 mb-md-0">
+                                  <strong className="text-primary">#{boleta.boletaId}</strong>
+                                  {boleta.numeroBoleta && (
+                                    <span className="text-muted ms-2 small">
+                                      ({boleta.numeroBoleta})
                                     </span>
-                                    {historial.monto !== 0 && (
-                                      <span className={`badge ${historial.monto > 0 ? 'bg-success' : 'bg-warning'}`}>
-                                        {formatPrice(historial.monto)}
-                                      </span>
-                                    )}
-                                  </div>
+                                  )}
                                 </div>
-                                <small className="text-muted text-nowrap">
-                                  {formatFecha(historial.fecha)}
-                                </small>
+                                <div className="d-flex gap-1 flex-wrap">
+                                  <span className={`badge bg-${getEstadoColor(boleta.estado)}`}>
+                                    {boleta.estado}
+                                  </span>
+                                  <span className={`badge ${boleta.monto > 0 ? 'bg-success' : 'bg-warning'}`}>
+                                    {formatPrice(boleta.monto)}
+                                  </span>
+                                </div>
                               </div>
                               
-                              {historial.items && historial.items.length > 0 && (
-                                <div className="mt-2">
-                                  <small className="text-muted">
-                                    <strong>Productos:</strong> {historial.items.join(', ')}
+                              <div className="d-flex flex-column flex-md-row justify-content-between align-items-start">
+                                <small className="text-muted">
+                                  <i className="bi bi-calendar me-1"></i>
+                                  {formatFecha(boleta.fecha)}
+                                </small>
+                                {boleta.cliente && boleta.cliente !== 'Cliente no especificado' && (
+                                  <small className="text-muted mt-1 mt-md-0">
+                                    <i className="bi bi-person me-1"></i>
+                                    {boleta.cliente}
                                   </small>
-                                </div>
-                              )}
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0 ms-2">
                             </div>
                           </div>
                         </div>
@@ -1065,20 +1144,75 @@ const Users = () => {
                     </div>
                   ) : (
                     <div className="text-center py-4">
-                      <i className="bi bi-inbox display-4 text-muted d-block mb-3"></i>
-                      <p className="text-muted mb-2">No hay historial registrado</p>
-                      <small className="text-muted">Este usuario no tiene actividades registradas en el sistema</small>
+                      {loadingHistorial ? (
+                        <>
+                          <div className="spinner-border text-primary mb-3" role="status">
+                            <span className="visually-hidden">Cargando historial...</span>
+                          </div>
+                          <p className="text-muted small">Cargando historial de compras...</p>
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-inbox display-6 text-muted d-block mb-2"></i>
+                          <p className="text-muted mb-1 small">No hay compras registradas</p>
+                          <small className="text-muted">
+                            Este {selectedUser.rol === 'CLIENTE' ? 'cliente' : 'usuario'} no tiene compras en el sistema
+                          </small>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Resumen compacto */}
+                  {historialUsuario.length > 0 && (
+                    <div className="mt-3 pt-2 border-top">
+                      <div className="row text-center">
+                        <div className="col-4">
+                          <small className="text-muted d-block">Promedio</small>
+                          <strong className="text-primary">
+                            {formatPrice(estadisticas.totalGastado / estadisticas.totalCompras)}
+                          </strong>
+                        </div>
+                        <div className="col-4">
+                          <small className="text-muted d-block">Completación</small>
+                          <strong className="text-success">
+                            {((estadisticas.comprasCompletadas / estadisticas.totalCompras) * 100).toFixed(0)}%
+                          </strong>
+                        </div>
+                        <div className="col-4">
+                          <small className="text-muted d-block">Última</small>
+                          <strong className="text-info">
+                            {historialUsuario.length > 0 ? 
+                              new Date(historialUsuario[0].fecha).toLocaleDateString('es-CL') : 
+                              'N/A'
+                            }
+                          </strong>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
-                <div className="modal-footer">
+                <div className="modal-footer py-2">
                   <button 
                     type="button" 
-                    className="btn btn-secondary" 
+                    className="btn btn-sm btn-secondary" 
                     onClick={handleCloseModals}
+                    disabled={loadingHistorial}
                   >
                     <i className="bi bi-x-circle me-1"></i> Cerrar
                   </button>
+                  {historialUsuario.length > 0 && (
+                    <button 
+                      type="button" 
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={() => {
+                        // Función para exportar el historial
+                        alert('Función de exportación - Próximamente');
+                      }}
+                    >
+                      <i className="bi bi-download me-1"></i> Exportar
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

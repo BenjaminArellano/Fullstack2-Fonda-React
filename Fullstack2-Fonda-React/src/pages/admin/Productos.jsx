@@ -310,7 +310,7 @@ const Productos = () => {
       setLoading(true);
       
       // Llamar al servicio de eliminación
-      const response = await DataService.deleteProducto(id);
+      const response = await DataService.deleteProductoCascada(id);
       
       console.log("✅ Producto eliminado exitosamente:", response);
       

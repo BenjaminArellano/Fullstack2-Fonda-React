@@ -21,6 +21,74 @@ const DataService = {
     return handleResponse(res);
   },
 
+  getMiPerfil: async () => {
+  try {
+    // Obtener el ID del usuario logueado del localStorage
+    const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado') || '{}');
+    const usuarioId = usuarioLogueado.usuId;
+    
+    if (!usuarioId) {
+      throw new Error('No hay usuario logueado. Por favor, inicia sesión nuevamente.');
+    }
+    
+    console.log('Obteniendo perfil para usuario ID:', usuarioId);
+    
+    const res = await fetch(`${BASE_URL}/usuariosById/${usuarioId}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status}: ${res.statusText}`);
+    }
+    
+    const perfil = await res.json();
+    console.log('Perfil obtenido:', perfil);
+    
+    return perfil;
+  } catch (error) {
+    console.error('Error en getMiPerfil:', error);
+    throw error;
+  }
+},
+
+updateMiPerfil: async (perfilData) => {
+  try {
+    const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado') || '{}');
+    const usuarioId = usuarioLogueado.usuId;
+    
+    if (!usuarioId) {
+      throw new Error('No hay usuario logueado. Por favor, inicia sesión nuevamente.');
+    }
+
+    // PREPARAR DATOS COMPLETOS para el backend
+    const datosActualizacion = {
+      usuId: usuarioId, // ← ESTE ES EL CAMPO CRÍTICO QUE FALTABA
+      nombreCompleto: perfilData.nombreCompleto,
+      correo: perfilData.correo,
+      rol: usuarioLogueado.rol // ← Mantener el rol actual
+    };
+
+    console.log('📤 Enviando datos de actualización al backend:', datosActualizacion);
+
+    const res = await fetch(`${BASE_URL}/updateUsuario`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datosActualizacion),
+    });
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('❌ Error del servidor:', errorText);
+      throw new Error(`Error ${res.status}: ${errorText}`);
+    }
+    
+    const resultado = await res.json();
+    console.log('✅ Perfil actualizado exitosamente:', resultado);
+    
+    return resultado;
+  } catch (error) {
+    console.error('❌ Error en updateMiPerfil:', error);
+    throw error;
+  }
+},
+
   getUsuarios: async () => {
     const res = await fetch(`${BASE_URL}/usuarios`);
     return handleResponse(res);
@@ -33,6 +101,13 @@ const DataService = {
 
   deleteUsuario: async (id) => {
     const res = await fetch(`${BASE_URL}/deleteUsuario/${id}`, { method: "DELETE" });
+    return handleResponse(res);
+  },
+
+  deleteUsuarioCascada: async (id) => {
+    const res = await fetch(`${BASE_URL}/deleteUsuarioCascada/${id}`, { 
+      method: "DELETE" 
+    });
     return handleResponse(res);
   },
 
@@ -112,6 +187,31 @@ const DataService = {
     throw error;
   }
 },
+
+deleteProductoCascada: async (id) => {
+    try {
+      const res = await fetch(`${BASE_URL}/deleteProductoCascada/${id}`, { 
+        method: "DELETE" 
+      });
+      
+      // Intentar parsear como JSON primero
+      const contentType = res.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        return await handleResponse(res);
+      } else {
+        // Si no es JSON, devolver el texto plano
+        const textResponse = await res.text();
+        if (!res.ok) {
+          throw new Error(textResponse || "Error en la eliminación con cascada");
+        }
+        return textResponse || "Producto y registros relacionados eliminados exitosamente";
+      }
+    } catch (error) {
+      console.error('Error en deleteProductoCascada:', error);
+      throw error;
+    }
+  },
 
   // =================== CATEGORIAS ===================
   addCategoria: async (categoria) => {
@@ -218,6 +318,19 @@ const DataService = {
     const res = await fetch(`${BASE_URL}/eliminarBoleta/${id}`, { method: "DELETE" });
     return handleResponse(res);
   },
+
+  getBoletasByUsuario: async (usuarioId) => {
+  try {
+    const res = await fetch(`${BASE_URL}/boletas/usuario/${usuarioId}`);
+    if (!res.ok) {
+      throw new Error(`Error ${res.status}: ${res.statusText}`);
+    }
+    return await res.json();
+  } catch (error) {
+    console.error('Error en getBoletasByUsuario:', error);
+    throw error;
+  }
+},
 
   // =================== DETALLE BOLETAS ===================
   addDetalleBoleta: async (detalle) => {

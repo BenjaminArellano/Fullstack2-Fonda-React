@@ -47,11 +47,6 @@ function Login() {
         return;
       }
 
-      if (usuarioEncontrado.rol === "ADMIN") {
-        navigate("/admin/dashboard");
-        return;
-      }
-
       // Crear token falso
       const tokenGenerado = Math.random().toString(36).substring(2) + Date.now();
 
@@ -66,7 +61,7 @@ function Login() {
       alert("Sesión iniciada correctamente");
 
       // Redirección por rol
-      if (usuarioEncontrado.rol === "admin") {
+      if (usuarioEncontrado.rol === "admin" || usuarioEncontrado.rol === "ADMIN") {
         navigate("/admin/dashboard");
         return;
       }

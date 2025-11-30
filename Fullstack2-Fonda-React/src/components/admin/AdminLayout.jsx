@@ -2,6 +2,7 @@ import Sidebar from './Sidebar';
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { removeFromLocalstorage } from '../../utils/localstorageHelper';
+import DataService from '../../utils/DataService';
 
 const logo = '/src/assets/admin/logoPNG.png';
 
@@ -11,27 +12,126 @@ const AdminLayout = () => {
   const [newMessage, setNewMessage] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
   
-  
-  const [adminProfile, setAdminProfile] = useState(() => {
-    const savedProfile = localStorage.getItem('adminProfile');
-    if (savedProfile) {
-      return JSON.parse(savedProfile);
-    }
-    return {
-      nombres: 'Huaso',
-      apellidos: 'Arellano',
-      correo: 'admin@fondaduoc.cl',
-      direccion: 'Av. Principal 123, Santiago, Chile',
-      rut: '12.345.678-9',
-      rol: 'Administrador Principal'
-    };
+  // Estado para el perfil del admin conectado a la base de datos
+  const [adminProfile, setAdminProfile] = useState({
+    usuId: null,
+    nombres: '',
+    apellidos: '',
+    nombreCompleto: '',
+    correo: '',
+    direccion: 'Av. Principal 123, Santiago, Chile',
+    rut: '',
+    rol: 'Administrador'
   });
 
-  
+  // Función para verificar sesión
+  const verificarSesion = () => {
+    const token = localStorage.getItem('token');
+    const usuarioLogueado = localStorage.getItem('usuarioLogueado');
+    
+    if (!token || !usuarioLogueado) {
+      console.warn('No hay sesión activa');
+      return false;
+    }
+    
+    return true;
+  };
+
+  // Cargar perfil real desde localStorage o base de datos
+  const cargarPerfilReal = async () => {
+    try {
+      setLoadingProfile(true);
+      
+      if (!verificarSesion()) {
+        cargarPerfilPorDefecto();
+        return;
+      }
+
+      // Primero intentar cargar desde localStorage
+      const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado') || '{}');
+      
+      if (usuarioLogueado && usuarioLogueado.usuId) {
+        console.log('✅ Usuario logueado encontrado en localStorage:', usuarioLogueado);
+        
+        // Dividir nombre completo en nombres y apellidos
+        const nombreCompleto = usuarioLogueado.nombreCompleto || '';
+        const nombresArray = nombreCompleto.split(' ');
+        const nombres = nombresArray[0] || '';
+        const apellidos = nombresArray.slice(1).join(' ') || nombreCompleto;
+        
+        const perfilData = {
+          usuId: usuarioLogueado.usuId,
+          nombres: nombres,
+          apellidos: apellidos,
+          nombreCompleto: nombreCompleto,
+          correo: usuarioLogueado.correo || '',
+          direccion: 'Av. Principal 123, Santiago, Chile',
+          rut: usuarioLogueado.rut || '',
+          rol: usuarioLogueado.rol || 'Administrador'
+        };
+        
+        setAdminProfile(perfilData);
+        localStorage.setItem('adminProfile', JSON.stringify(perfilData));
+        
+      } else {
+        // Si no hay usuario logueado, intentar cargar desde la API
+        console.log('🔄 Cargando perfil desde API...');
+        const perfil = await DataService.getMiPerfil();
+        
+        const nombreCompleto = perfil.nombreCompleto || '';
+        const nombresArray = nombreCompleto.split(' ');
+        const nombres = nombresArray[0] || '';
+        const apellidos = nombresArray.slice(1).join(' ') || nombreCompleto;
+        
+        const perfilData = {
+          usuId: perfil.usuId,
+          nombres: nombres,
+          apellidos: apellidos,
+          nombreCompleto: nombreCompleto,
+          correo: perfil.correo || '',
+          direccion: 'Av. Principal 123, Santiago, Chile',
+          rut: perfil.rut || '',
+          rol: perfil.rol || 'Administrador'
+        };
+        
+        setAdminProfile(perfilData);
+        localStorage.setItem('adminProfile', JSON.stringify(perfilData));
+      }
+      
+    } catch (error) {
+      console.error('❌ Error al cargar perfil:', error);
+      cargarPerfilPorDefecto();
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  // Cargar perfil por defecto
+  const cargarPerfilPorDefecto = () => {
+    const savedProfile = localStorage.getItem('adminProfile');
+    if (savedProfile) {
+      setAdminProfile(JSON.parse(savedProfile));
+    } else {
+      setAdminProfile({
+        usuId: null,
+        nombres: 'Administrador',
+        apellidos: 'Sistema',
+        nombreCompleto: 'Administrador Sistema',
+        correo: 'admin@fondaduoc.cl',
+        direccion: 'Av. Principal 123, Santiago, Chile',
+        rut: '12.345.678-9',
+        rol: 'Administrador Principal'
+      });
+    }
+  };
+
+  // Cargar perfil al montar el componente
   useEffect(() => {
-    localStorage.setItem('adminProfile', JSON.stringify(adminProfile));
-  }, [adminProfile]);
+    console.log('🔄 AdminLayout montado - Cargando perfil...');
+    cargarPerfilReal();
+  }, []);
 
   const chatRef = useRef(null);
   const profileRef = useRef(null);
@@ -44,7 +144,6 @@ const AdminLayout = () => {
 
   const navigate = useNavigate();
 
-  
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -61,7 +160,6 @@ const AdminLayout = () => {
     };
   }, []);
 
-  
   const [chatMessages, setChatMessages] = useState([
     { id: 1, sender: 'user', message: 'Hola, tengo un problema con mi envío', time: '10:30 AM', user: 'María González' },
     { id: 2, sender: 'admin', message: '¡Hola María! ¿En qué puedo ayudarte?', time: '10:31 AM', user: 'Soporte' },
@@ -83,19 +181,16 @@ const AdminLayout = () => {
     }
   };
 
-  
   const handleOpenProfileModal = () => {
     setShowProfileModal(true);
     setActivePopover(null); 
   };
 
-  
   const handleCloseProfileModal = () => {
     setShowProfileModal(false);
     setIsEditing(false);
   };
 
-  
   const handleProfileChange = (field, value) => {
     setAdminProfile(prev => ({
       ...prev,
@@ -103,24 +198,66 @@ const AdminLayout = () => {
     }));
   };
 
-  
-  const handleSaveProfile = () => {
-    
-    localStorage.setItem('adminProfile', JSON.stringify(adminProfile));
-    console.log('Perfil guardado:', adminProfile);
-    setIsEditing(false);
-    
-    
-    alert('Perfil actualizado correctamente');
+  // Guardar perfil en la base de datos
+  const handleSaveProfile = async () => {
+    try {
+      setLoadingProfile(true);
+      
+      // Reconstruir nombre completo
+      const nombreCompleto = `${adminProfile.nombres} ${adminProfile.apellidos}`.trim();
+      
+      const datosActualizacion = {
+        nombreCompleto: nombreCompleto,
+        correo: adminProfile.correo
+      };
+      
+      console.log('💾 Guardando perfil:', datosActualizacion);
+      
+      // Verificar que el método existe antes de llamarlo
+      if (!DataService.updateMiPerfil) {
+        throw new Error('El método updateMiPerfil no está disponible en DataService');
+      }
+      
+      // Actualizar en la base de datos
+      await DataService.updateMiPerfil(datosActualizacion);
+      
+      // Actualizar estado local
+      setAdminProfile(prev => ({
+        ...prev,
+        nombreCompleto: nombreCompleto
+      }));
+      
+      // Guardar en localStorage
+      const perfilActualizado = {
+        ...adminProfile,
+        nombreCompleto: nombreCompleto
+      };
+      localStorage.setItem('adminProfile', JSON.stringify(perfilActualizado));
+      
+      // Actualizar usuario en localStorage
+      const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado') || '{}');
+      if (usuarioLogueado.usuId === adminProfile.usuId) {
+        usuarioLogueado.nombreCompleto = nombreCompleto;
+        usuarioLogueado.correo = adminProfile.correo;
+        localStorage.setItem('usuarioLogueado', JSON.stringify(usuarioLogueado));
+      }
+      
+      // Disparar evento para notificar a otros componentes
+      window.dispatchEvent(new Event('adminProfileUpdated'));
+      
+      alert('✅ Perfil actualizado correctamente');
+      setIsEditing(false);
+      
+    } catch (error) {
+      console.error('❌ Error al guardar perfil:', error);
+      alert('❌ Error al actualizar perfil: ' + error.message);
+    } finally {
+      setLoadingProfile(false);
+    }
   };
 
-  
   const handleCancelEdit = () => {
-    
-    const savedProfile = localStorage.getItem('adminProfile');
-    if (savedProfile) {
-      setAdminProfile(JSON.parse(savedProfile));
-    }
+    cargarPerfilReal();
     setIsEditing(false);
   };
 
@@ -131,20 +268,21 @@ const AdminLayout = () => {
   const handleLogout = () => {
     removeFromLocalstorage("token");
     removeFromLocalstorage("usuarioLogueado");
+    removeFromLocalstorage("adminProfile");
     alert("Sesión cerrada");
     IrAHome("/");
   };
 
   return (
     <div className="admin-layout d-flex">
-      {/* Barra lateral - Pasa el perfil del admin como prop */}
+      {/* Barra lateral */}
       <Sidebar collapsed={collapsed} adminProfile={adminProfile} />
       
-      {/* Contenedor principal: NAV arriba y espacio para las paginas */}
+      {/* Contenedor principal */}
       <div className={`flex-grow-1 main-content d-flex flex-column ${collapsed ? 'collapsed' : ''}`} style={{ minHeight: '100vh' }}>
         {/* Navbar superior */}
         <nav className={`main-header navbar navbar-expand navbar-white navbar-light ${collapsed ? 'collapsed' : ''}`}>
-          <div className="container-fluid d-flex align-items-center" >
+          <div className="container-fluid d-flex align-items-center">
             {/* Bloque izquierdo: hamburguesa, logo y saludo */}
             <div className="d-flex align-items-center">
               {/* Botón hamburguesa */}
@@ -170,9 +308,16 @@ const AdminLayout = () => {
                 color: '#d32f2f',
                 letterSpacing: '1.5px'
               }}>
-                👋 ¡Buenos días, pariente <span style={{ color: '#0D47A1' }}>{adminProfile.apellidos}</span>! 🎉
+                {loadingProfile ? (
+                  '🔄 Cargando...'
+                ) : (
+                  <span dangerouslySetInnerHTML={{
+                    __html: `👋 ¡Buenos días, pariente <span style="color: #0D47A1">${adminProfile.apellidos}</span>! 🎉`
+                  }} />
+                )}
               </span>
             </div>
+            
             {/* Bloque derecho: chat soporte y usuario */}
             <div className="d-flex align-items-center ms-auto">
               {/* Chat Soporte con popover */}
@@ -193,7 +338,7 @@ const AdminLayout = () => {
                   </span>
                 </a>
                 
-                {/* Popover de Chat Mejorado */}
+                {/* Popover de Chat */}
                 {activePopover === 'chat' && (
                   <div className="popover-container show" style={{
                     position: 'absolute',
@@ -328,9 +473,10 @@ const AdminLayout = () => {
                           <button 
                             className="btn btn-outline-primary btn-sm"
                             onClick={handleOpenProfileModal}
+                            disabled={loadingProfile}
                           >
                             <i className="bi bi-person-gear me-2"></i>
-                            Mi cuenta
+                            {loadingProfile ? 'Cargando...' : 'Mi cuenta'}
                           </button>
                           <button className="btn btn-outline-danger btn-sm" onClick={handleLogout}>
                             <i className="bi bi-box-arrow-right me-2"></i>
@@ -345,6 +491,8 @@ const AdminLayout = () => {
             </div>
           </div>
         </nav>
+        
+        {/* Contenido de las páginas */}
         <div className="flex-grow-1 p-3 contenido-admin" style={{ minHeight: 0 }}>
           <Outlet />
         </div>
@@ -353,32 +501,9 @@ const AdminLayout = () => {
       {/* Modal de Mi Cuenta */}
       {showProfileModal && (
         <>
-          <div 
-            className="modal-backdrop show modal-backdrop-animation" 
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              zIndex: 1070
-            }}
-          ></div>
-          
-          <div 
-            className="modal show d-block modal-show" 
-            tabIndex="-1" 
-            style={{ 
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              zIndex: 1080,
-              overflow: 'hidden'
-            }}
-          >
-            <div className="modal-dialog modal-dialog-centered modal-lg modal-animation">
+          <div className="modal-backdrop show"></div>
+          <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1060 }}>
+            <div className="modal-dialog modal-dialog-centered modal-lg">
               <div className="modal-content border border-2 border-primary">
                 <div className="modal-header bg-primary text-white">
                   <h5 className="modal-title">
@@ -389,113 +514,126 @@ const AdminLayout = () => {
                     type="button" 
                     className="btn-close btn-close-white" 
                     onClick={handleCloseProfileModal}
+                    disabled={loadingProfile}
                   ></button>
                 </div>
                 
                 <div className="modal-body">
-                  {/* Información del perfil */}
-                  <div className="row">
-                    <div className="col-md-4 text-center mb-4">
-                      <img 
-                        src="https://pbs.twimg.com/profile_images/378800000162907418/3227125f0f2eade72449e2204da234d4_200x200.jpeg" 
-                        alt="Admin" 
-                        className="rounded-circle border border-4 border-primary mb-3"
-                        style={{ width: '120px', height: '120px', objectFit: 'cover' }}
-                      />
+                  {loadingProfile ? (
+                    <div className="text-center py-4">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Cargando...</span>
+                      </div>
+                      <p className="mt-2">Cargando información del perfil...</p>
                     </div>
-                    
-                    <div className="col-md-8">
-                      <div className="row g-3">
-                        {/* Nombres */}
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold">Nombres</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            value={adminProfile.nombres}
-                            onChange={(e) => handleProfileChange('nombres', e.target.value)}
-                            disabled={!isEditing}
-                            style={!isEditing ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
-                          />
+                  ) : (
+                    <div className="row">
+                      <div className="col-md-4 text-center mb-4">
+                        <img 
+                          src="https://pbs.twimg.com/profile_images/378800000162907418/3227125f0f2eade72449e2204da234d4_200x200.jpeg" 
+                          alt="Admin" 
+                          className="rounded-circle border border-4 border-primary mb-3"
+                          style={{ width: '120px', height: '120px', objectFit: 'cover' }}
+                        />
+                        <div className="text-muted small">
+                          <i className="bi bi-info-circle me-1"></i>
+                          ID: {adminProfile.usuId || 'N/A'}
                         </div>
-                        
-                        {/* Apellidos */}
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold">Apellidos</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            value={adminProfile.apellidos}
-                            onChange={(e) => handleProfileChange('apellidos', e.target.value)}
-                            disabled={!isEditing}
-                            style={!isEditing ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
-                          />
-                        </div>
-                        
-                        {/* Correo */}
-                        <div className="col-12">
-                          <label className="form-label fw-semibold">Correo Electrónico</label>
-                          <input
-                            type="email"
-                            className="form-control"
-                            value={adminProfile.correo}
-                            onChange={(e) => handleProfileChange('correo', e.target.value)}
-                            disabled={!isEditing}
-                            style={!isEditing ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
-                          />
-                          <div className="form-text">
-                            <i className="bi bi-info-circle me-1"></i>
-                            Debe terminar en @duocuc.cl o @fondaduoc.cl
+                      </div>
+                      
+                      <div className="col-md-8">
+                        <div className="row g-3">
+                          {/* Nombres */}
+                          <div className="col-md-6">
+                            <label className="form-label fw-semibold">Nombres</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              value={adminProfile.nombres}
+                              onChange={(e) => handleProfileChange('nombres', e.target.value)}
+                              disabled={!isEditing || loadingProfile}
+                              style={!isEditing ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
+                            />
                           </div>
-                        </div>
-                        
-                        {/* Dirección */}
-                        <div className="col-12">
-                          <label className="form-label fw-semibold">Dirección</label>
-                          <textarea
-                            className="form-control"
-                            rows="3"
-                            value={adminProfile.direccion}
-                            onChange={(e) => handleProfileChange('direccion', e.target.value)}
-                            disabled={!isEditing}
-                            style={!isEditing ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
-                          />
-                        </div>
-                        
-                        {/* RUT (Siempre deshabilitado) */}
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold">RUT</label>
-                          <input
-                            type="text"
-                            className="form-control bg-light"
-                            value={adminProfile.rut}
-                            disabled
-                            style={{ cursor: 'not-allowed', opacity: 0.7 }}
-                          />
-                          <div className="form-text text-muted">
-                            <i className="bi bi-lock me-1"></i>
-                            El RUT no puede ser modificado
+                          
+                          {/* Apellidos */}
+                          <div className="col-md-6">
+                            <label className="form-label fw-semibold">Apellidos</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              value={adminProfile.apellidos}
+                              onChange={(e) => handleProfileChange('apellidos', e.target.value)}
+                              disabled={!isEditing || loadingProfile}
+                              style={!isEditing ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
+                            />
                           </div>
-                        </div>
-                        
-                        {/* Rol (Siempre deshabilitado) */}
-                        <div className="col-md-6">
-                          <label className="form-label fw-semibold">Rol</label>
-                          <input
-                            type="text"
-                            className="form-control bg-light"
-                            value={adminProfile.rol}
-                            disabled
-                            style={{ cursor: 'not-allowed', opacity: 0.7 }}
-                          />
-                          <div className="form-text text-muted">
-                            <i className="bi bi-shield-check me-1"></i>
-                            Rol del sistema
+                          
+                          {/* Correo */}
+                          <div className="col-12">
+                            <label className="form-label fw-semibold">Correo Electrónico</label>
+                            <input
+                              type="email"
+                              className="form-control"
+                              value={adminProfile.correo}
+                              onChange={(e) => handleProfileChange('correo', e.target.value)}
+                              disabled={!isEditing || loadingProfile}
+                              style={!isEditing ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
+                            />
+                            <div className="form-text">
+                              <i className="bi bi-info-circle me-1"></i>
+                              Debe terminar en @duocuc.cl, @fondaduoc.cl, @vendedor.cl o @gmail.com
+                            </div>
+                          </div>
+                          
+                          {/* Dirección */}
+                          <div className="col-12">
+                            <label className="form-label fw-semibold">Dirección</label>
+                            <textarea
+                              className="form-control"
+                              rows="3"
+                              value={adminProfile.direccion}
+                              onChange={(e) => handleProfileChange('direccion', e.target.value)}
+                              disabled={!isEditing || loadingProfile}
+                              style={!isEditing ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
+                            />
+                          </div>
+                          
+                          {/* RUT (Siempre deshabilitado) */}
+                          <div className="col-md-6">
+                            <label className="form-label fw-semibold">RUT</label>
+                            <input
+                              type="text"
+                              className="form-control bg-light"
+                              value={adminProfile.rut}
+                              disabled
+                              style={{ cursor: 'not-allowed', opacity: 0.7 }}
+                            />
+                            <div className="form-text text-muted">
+                              <i className="bi bi-lock me-1"></i>
+                              El RUT no puede ser modificado
+                            </div>
+                          </div>
+                          
+                          {/* Rol (Siempre deshabilitado) */}
+                          <div className="col-md-6">
+                            <label className="form-label fw-semibold">Rol</label>
+                            <input
+                              type="text"
+                              className="form-control bg-light"
+                              value={adminProfile.rol}
+                              disabled
+                              style={{ cursor: 'not-allowed', opacity: 0.7 }}
+                            />
+                            <div className="form-text text-muted">
+                              <i className="bi bi-shield-check me-1"></i>
+                              Rol del sistema
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                 
                 <div className="modal-footer">
@@ -505,6 +643,7 @@ const AdminLayout = () => {
                         type="button" 
                         className="btn btn-secondary" 
                         onClick={handleCloseProfileModal}
+                        disabled={loadingProfile}
                       >
                         <i className="bi bi-x-circle me-1"></i>
                         Cerrar
@@ -513,6 +652,7 @@ const AdminLayout = () => {
                         type="button" 
                         className="btn btn-primary"
                         onClick={() => setIsEditing(true)}
+                        disabled={loadingProfile}
                       >
                         <i className="bi bi-pencil-square me-1"></i>
                         Editar Perfil
@@ -524,6 +664,7 @@ const AdminLayout = () => {
                         type="button" 
                         className="btn btn-outline-secondary" 
                         onClick={handleCancelEdit}
+                        disabled={loadingProfile}
                       >
                         <i className="bi bi-arrow-counterclockwise me-1"></i>
                         Cancelar
@@ -532,9 +673,19 @@ const AdminLayout = () => {
                         type="button" 
                         className="btn btn-success"
                         onClick={handleSaveProfile}
+                        disabled={loadingProfile}
                       >
-                        <i className="bi bi-check-circle me-1"></i>
-                        Guardar Cambios
+                        {loadingProfile ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-1" role="status"></span>
+                            Guardando...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-check-circle me-1"></i>
+                            Guardar Cambios
+                          </>
+                        )}
                       </button>
                     </>
                   )}
