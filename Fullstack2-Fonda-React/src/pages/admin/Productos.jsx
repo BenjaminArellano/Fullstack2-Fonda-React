@@ -303,22 +303,48 @@ const Productos = () => {
 
   // Eliminar producto
   const handleDeleteProducto = async (id) => {
-    const producto = productos.find(p => p.prodId === id);
-    
-    if (window.confirm(`¿Estás seguro de que deseas eliminar el producto "${producto?.nombreProducto}"?`)) {
-      try {
-        setLoading(true);
-        await DataService.deleteProducto(id);
+  const producto = productos.find(p => p.prodId === id);
+  
+  if (window.confirm(`¿Estás seguro de que deseas eliminar el producto "${producto?.nombreProducto}"?`)) {
+    try {
+      setLoading(true);
+      
+      // Llamar al servicio de eliminación
+      const response = await DataService.deleteProducto(id);
+      
+      console.log("✅ Producto eliminado exitosamente:", response);
+      
+      // Mostrar mensaje de éxito
+      if (typeof response === 'string') {
+        alert(response); // Si el backend devuelve texto plano
+      } else {
         alert('✅ Producto eliminado exitosamente');
-        await cargarProductos();
-      } catch (error) {
-        console.error("Error al eliminar producto:", error);
-        alert("Error al eliminar producto: " + error.message);
-      } finally {
-        setLoading(false);
       }
+      
+      // Recargar la lista de productos
+      await cargarProductos();
+      
+    } catch (error) {
+      console.error("❌ Error al eliminar producto:", error);
+      
+      // Manejar diferentes tipos de error
+      let errorMessage = "Error al eliminar producto";
+      
+      try {
+        // Intentar parsear como JSON primero
+        const errorData = JSON.parse(error.message);
+        errorMessage = errorData.message || errorData;
+      } catch (parseError) {
+        // Si no es JSON, usar el mensaje directamente
+        errorMessage = error.message || "Error desconocido al eliminar producto";
+      }
+      
+      alert("❌ " + errorMessage);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
+};
 
   const clearFilters = () => {
     setSearchTerm('');

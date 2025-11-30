@@ -6,6 +6,8 @@ import ProporcionCategoriaPie from '../../components/charts/ProporcionCategoriaP
 import RankingProductosBar from '../../components/charts/RankingProductosBar';
 import { productos as productosIniciales } from '../../data/admin/productos';
 import { usuarios as usuariosIniciales } from '../../data/admin/usuarios';
+import DataService from '../../utils/DataService';
+
 
 const cardStyle = { background: "#fff", padding: "1rem", borderRadius: "10px", boxShadow: "0 5px 18px 0 rgba(0, 0, 0, 0.51)" };
 
@@ -15,118 +17,129 @@ export default function Dashboard() {
     productosStockCritico: 0,
     usuariosRegistrados: 0,
     totalProductos: 0,
-    administradoresCount: 0,
-    ventasHoy: 42,
-    ingresosMes: 12543000
+    administradoresCount: 0
   });
 
-  
-  const cargarProductosActualizados = () => {
-    const productosGuardados = localStorage.getItem('productos');
-    if (productosGuardados) {
-      return JSON.parse(productosGuardados);
-    }
-    return productosIniciales;
-  };
+  const [categoriasCount, setCategoriasCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  
-  const cargarUsuariosActualizados = () => {
-    const usuariosGuardados = localStorage.getItem('usuarios');
-    if (usuariosGuardados) {
-      return JSON.parse(usuariosGuardados);
-    }
-    return usuariosIniciales;
-  };
+  // Función para cargar las métricas de las tarjetas
+  const cargarMetricasTarjetas = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  useEffect(() => {
-    const productosActuales = cargarProductosActualizados();
-    const usuariosActuales = cargarUsuariosActualizados();
-    
-    
-    const productosSinStock = productosActuales.filter(producto => producto.stock === 0).length;
-    const productosStockCritico = productosActuales.filter(producto => 
-      producto.stock > 0 && producto.stock <= producto.stockCritico
-    ).length;
-    const usuariosRegistrados = usuariosActuales.length;
-    const totalProductos = productosActuales.length;
-    const administradoresCount = usuariosActuales.filter(u => u.rol === 'admin').length;
-
-    setMetricas({
-      productosSinStock,
-      productosStockCritico,
-      usuariosRegistrados,
-      totalProductos,
-      administradoresCount,
-      ventasHoy: 42,
-      ingresosMes: 12543000
-    });
-  }, []);
-
-  
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const productosActuales = cargarProductosActualizados();
-      const usuariosActuales = cargarUsuariosActualizados();
+      // Cargar productos usando tu endpoint existente
+      const productos = await DataService.getProductos();
       
-      const productosSinStock = productosActuales.filter(producto => producto.stock === 0).length;
-      const productosStockCritico = productosActuales.filter(producto => 
-        producto.stock > 0 && producto.stock <= producto.stockCritico
+      // Cargar usuarios usando tu endpoint existente
+      const usuarios = await DataService.getUsuarios();
+
+      // Calcular métricas de productos
+      const productosSinStock = productos.filter(producto => 
+        producto.stock === 0 || producto.stock === '0'
       ).length;
-      const administradoresCount = usuariosActuales.filter(u => u.rol === 'admin').length;
       
-      setMetricas(prev => ({
-        ...prev,
+      const productosStockCritico = productos.filter(producto => {
+        const stock = parseInt(producto.stock) || 0;
+        const stockCritico = parseInt(producto.stockCritico) || 5; // Valor por defecto si no existe
+        return stock > 0 && stock <= stockCritico;
+      }).length;
+
+      // Calcular métricas de usuarios
+      const administradoresCount = usuarios.filter(u => 
+        u.rol === 'admin' || u.rol === 'ADMIN' || u.rol === 'Administrador'
+      ).length;
+
+      // Calcular categorías únicas - adaptado a tu estructura de datos
+      const categoriasUnicas = new Set(
+        productos.map(p => {
+          // Manejar diferentes estructuras posibles de categoría
+          if (p.categoria && typeof p.categoria === 'object') {
+            return p.categoria.nombre || p.categoria.catNombre || 'Sin categoría';
+          }
+          return p.categoria || 'Sin categoría';
+        })
+      ).size;
+
+      // Actualizar estado
+      setMetricas({
         productosSinStock,
         productosStockCritico,
-        usuariosRegistrados: usuariosActuales.length,
-        totalProductos: productosActuales.length,
+        usuariosRegistrados: usuarios.length,
+        totalProductos: productos.length,
         administradoresCount
-      }));
-    };
+      });
 
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    
-    const interval = setInterval(() => {
-      const productosActuales = cargarProductosActualizados();
-      const usuariosActuales = cargarUsuariosActualizados();
-      
-      const currentProductosSinStock = productosActuales.filter(producto => producto.stock === 0).length;
-      const currentProductosStockCritico = productosActuales.filter(producto => 
-        producto.stock > 0 && producto.stock <= producto.stockCritico
-      ).length;
-      const currentAdministradoresCount = usuariosActuales.filter(u => u.rol === 'admin').length;
-      
-      if (currentProductosSinStock !== metricas.productosSinStock || 
-          currentProductosStockCritico !== metricas.productosStockCritico ||
-          currentAdministradoresCount !== metricas.administradoresCount) {
-        
-        setMetricas(prev => ({
-          ...prev,
-          productosSinStock: currentProductosSinStock,
-          productosStockCritico: currentProductosStockCritico,
-          usuariosRegistrados: usuariosActuales.length,
-          totalProductos: productosActuales.length,
-          administradoresCount: currentAdministradoresCount
-        }));
-      }
-    }, 3000);
+      setCategoriasCount(categoriasUnicas);
 
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, [metricas.productosSinStock, metricas.productosStockCritico, metricas.administradoresCount]);
+      console.log('Métricas de tarjetas cargadas:', {
+        productosTotal: productos.length,
+        productosSinStock,
+        productosStockCritico,
+        usuariosTotal: usuarios.length,
+        administradoresCount,
+        categoriasUnicas
+      });
 
-  
-  const categoriasUnicas = () => {
-    const productosActuales = cargarProductosActualizados();
-    return new Set(productosActuales.map(p => p.categoria)).size;
+    } catch (error) {
+      console.error('Error al cargar métricas de tarjetas:', error);
+      setError('Error al cargar los datos del dashboard');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Cargar métricas al montar el componente
+  useEffect(() => {
+    cargarMetricasTarjetas();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="dashboard-admin" style={{ padding: '1rem', position: 'relative', zIndex: 5 }}>
+        <div className="d-flex justify-content-center align-items-center" style={{ height: '200px' }}>
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Cargando métricas...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="dashboard-admin" style={{ padding: '1rem', position: 'relative', zIndex: 5 }}>
+        <div className="alert alert-danger d-flex align-items-center" role="alert">
+          <i className="bi bi-exclamation-triangle-fill me-2"></i>
+          <div>{error}</div>
+          <button 
+            className="btn btn-sm btn-outline-danger ms-3"
+            onClick={cargarMetricasTarjetas}
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-admin" style={{ padding: '1rem', position: 'relative', zIndex: 5 }}>
+      
+      {/* Botón de actualizar */}
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2 style={{ color: '#333', fontWeight: '600' }}>Dashboard General</h2>
+        <button 
+          className="btn btn-outline-primary btn-sm"
+          onClick={cargarMetricasTarjetas}
+          disabled={loading}
+        >
+          <i className="bi bi-arrow-clockwise me-1"></i>
+          {loading ? 'Cargando...' : 'Actualizar'}
+        </button>
+      </div>
       
       {/* Tarjetas de Métricas */}
       <div className="metricas-grid" style={{ 
@@ -266,7 +279,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div style={{ marginTop: '12px', fontSize: '0.8rem', opacity: 0.8 }}>
-            {categoriasUnicas()} categorías
+            {categoriasCount} categorías
           </div>
         </div>
 

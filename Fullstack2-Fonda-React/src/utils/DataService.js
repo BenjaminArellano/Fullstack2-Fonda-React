@@ -89,9 +89,29 @@ const DataService = {
   },
 
   deleteProducto: async (id) => {
-    const res = await fetch(`${BASE_URL}/deleteProducto/${id}`, { method: "DELETE" });
-    return handleResponse(res);
-  },
+  try {
+    const res = await fetch(`${BASE_URL}/deleteProducto/${id}`, { 
+      method: "DELETE" 
+    });
+    
+    // Intentar parsear como JSON primero
+    const contentType = res.headers.get('content-type');
+    
+    if (contentType && contentType.includes('application/json')) {
+      return await handleResponse(res);
+    } else {
+      // Si no es JSON, devolver el texto plano
+      const textResponse = await res.text();
+      if (!res.ok) {
+        throw new Error(textResponse || "Error en la eliminación");
+      }
+      return textResponse || "Producto eliminado exitosamente";
+    }
+  } catch (error) {
+    console.error('Error en deleteProducto:', error);
+    throw error;
+  }
+},
 
   // =================== CATEGORIAS ===================
   addCategoria: async (categoria) => {
