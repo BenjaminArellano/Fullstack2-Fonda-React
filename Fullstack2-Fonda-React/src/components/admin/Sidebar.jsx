@@ -116,12 +116,6 @@ const Sidebar = ({ collapsed }) => {
               <p>Órdenes/Boletas</p>
             </NavLink>
           </li>
-          <li className="nav-item">
-            <NavLink to="/admin/registro-actividad" className="nav-link">
-              <i className="bi bi-clock-history nav-icon"></i>
-              <p>Actividad</p>
-            </NavLink>
-          </li>
         </ul>
       </nav>
     </div>

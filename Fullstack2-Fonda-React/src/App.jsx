@@ -26,7 +26,6 @@ import Users from './pages/admin/users.jsx'
 import ProductosAdmin from './pages/admin/Productos.jsx'
 import CategoriasAdmin from './pages/admin/Categorias.jsx'
 import Ordenes from './pages/admin/Ordenes.jsx'
-import Actividad from './pages/admin/Actividad.jsx'
 
 // 👉 IMPORT PAYPAL
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
@@ -73,7 +72,6 @@ function App() {
             <Route path="productos" element={<ProductosAdmin />} />
             <Route path="categorias" element={<CategoriasAdmin />} />
             <Route path="ordenes" element={<Ordenes/>} />
-            <Route path="registro-actividad" element={<Actividad/>} />
             
             <Route path="*" element={<Navigate to="dashboard" replace />} />
           </Route>

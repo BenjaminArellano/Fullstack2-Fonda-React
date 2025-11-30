@@ -33,8 +33,6 @@ const AdminLayout = () => {
     localStorage.setItem('adminProfile', JSON.stringify(adminProfile));
   }, [adminProfile]);
 
-  
-  const notificationsRef = useRef(null);
   const chatRef = useRef(null);
   const profileRef = useRef(null);
 
@@ -50,7 +48,6 @@ const AdminLayout = () => {
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
-        notificationsRef.current && !notificationsRef.current.contains(event.target) &&
         chatRef.current && !chatRef.current.contains(event.target) &&
         profileRef.current && !profileRef.current.contains(event.target)
       ) {
@@ -63,14 +60,6 @@ const AdminLayout = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  
-  const notifications = [
-    { id: 1, type: 'success', title: 'Pedido completado', message: 'El pedido #12345 ha sido entregado', time: 'Hace 5 min', unread: true },
-    { id: 2, type: 'warning', title: 'Stock bajo', message: 'Quedan 3 unidades de Polera Santaferia', time: 'Hace 1 hora', unread: true },
-    { id: 3, type: 'info', title: 'Nuevo usuario', message: 'Juan Pérez se ha registrado', time: 'Hace 2 horas', unread: false },
-    { id: 4, type: 'error', title: 'Problema de pago', message: 'Error en el pago del pedido #12346', time: 'Hace 3 horas', unread: false }
-  ];
 
   
   const [chatMessages, setChatMessages] = useState([
@@ -135,8 +124,6 @@ const AdminLayout = () => {
     setIsEditing(false);
   };
 
-  const unreadNotifications = notifications.filter(n => n.unread).length;
-
   const IrAHome = (ruta) => {
     navigate(ruta);
   };
@@ -186,93 +173,8 @@ const AdminLayout = () => {
                 👋 ¡Buenos días, pariente <span style={{ color: '#0D47A1' }}>{adminProfile.apellidos}</span>! 🎉
               </span>
             </div>
-            {/* Bloque derecho: notificación, chat soporte y usuario */}
+            {/* Bloque derecho: chat soporte y usuario */}
             <div className="d-flex align-items-center ms-auto">
-              
-              {/* Notificaciones con popover */}
-              <div className="position-relative" ref={notificationsRef}>
-                <a 
-                  className="nav-link position-relative" 
-                  href="#" 
-                  style={{ padding: '0 0.8rem' }}
-                  onClick={(e) => { e.preventDefault(); togglePopover('notifications'); }}
-                >
-                  <i className="bi bi-bell-fill" style={{ fontSize: '1.5em', color: "#007bff" }}></i>
-                  {unreadNotifications > 0 && (
-                    <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style={{
-                      fontSize: '0.6em',
-                      padding: '4px 6px',
-                      minWidth: '18px'
-                    }}>
-                      {unreadNotifications}
-                    </span>
-                  )}
-                </a>
-                
-                {/* Popover de Notificaciones */}
-                {activePopover === 'notifications' && (
-                  <div className="popover-container show" style={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: '0',
-                    width: '380px',
-                    zIndex: 1060,
-                    marginTop: '10px'
-                  }}>
-                    <div className="card shadow-lg border border-secondary" style={{ borderWidth: '2px' }}>
-                      <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h6 className="mb-0">
-                          <i className="bi bi-bell-fill me-2"></i>
-                          Notificaciones
-                        </h6>
-                        <span className="badge bg-light text-primary">{notifications.length}</span>
-                      </div>
-                      <div className="card-body p-0" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                      {notifications.map(notification => (
-                        <div 
-                          key={notification.id} 
-                          className={`notification-item p-3 border-bottom ${notification.unread ? 'bg-light bg-opacity-50' : ''}`}
-                          style={{ 
-                            cursor: 'pointer', 
-                            borderColor: '#e9ecef',
-                            transition: 'background-color 0.15s ease'
-                          }}
-                        >
-                          <div className="d-flex align-items-start">
-                            <div className={`badge bg-${notification.type === 'success' ? 'success' : notification.type === 'warning' ? 'warning' : notification.type === 'error' ? 'danger' : 'info'} me-3`} style={{ 
-                              minWidth: '32px',
-                              flexShrink: 0
-                            }}>
-                              <i className={`bi bi-${notification.type === 'success' ? 'check-circle' : notification.type === 'warning' ? 'exclamation-triangle' : notification.type === 'error' ? 'x-circle' : 'info-circle'}`}></i>
-                            </div>
-                            <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                              <div className="d-flex justify-content-between align-items-start mb-1">
-                                <h6 className="mb-0 text-dark text-truncate">{notification.title}</h6>
-                                {notification.unread && (
-                                  <span className="badge bg-primary ms-2 flex-shrink-0">Nuevo</span>
-                                )}
-                              </div>
-                              <p className="mb-1 text-muted small text-break">{notification.message}</p>
-                              <small className="text-muted">
-                                <i className="bi bi-clock me-1"></i>
-                                {notification.time}
-                              </small>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                      <div className="card-footer text-center bg-light">
-                        <button className="btn btn-outline-primary btn-sm">
-                          <i className="bi bi-list-ul me-1"></i>
-                          Ver todas las notificaciones
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
               {/* Chat Soporte con popover */}
               <div className="position-relative" ref={chatRef}>
                 <a 
