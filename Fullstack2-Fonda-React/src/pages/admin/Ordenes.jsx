@@ -26,7 +26,7 @@ const Ordenes = () => {
 
   // Función para mapear estado de BD a frontend
   const mapearEstado = (estadoBD) => {
-    if (estadoBD === 'PAGADA') return 'completada';
+    if (estadoBD === 'PAGADA' || estadoBD === 'Pagado') return 'completada';
     return estadoBD ? estadoBD.toLowerCase() : 'desconocido';
   };
 
@@ -227,7 +227,7 @@ const Ordenes = () => {
 
   // Estadísticas - CORREGIDAS
   const totalVentas = boletas
-    .filter(boleta => boleta.estado === 'PAGADA') // ← Usa 'PAGADA' directamente
+    .filter(boleta => boleta.estado === 'PAGADA' || boleta.estado === 'Pagado') 
     .reduce((sum, boleta) => sum + (boleta.total || 0), 0);
 
   const boletasHoy = boletas.filter(boleta => 
@@ -235,7 +235,7 @@ const Ordenes = () => {
   ).length;
 
   const boletasCompletadas = boletas.filter(boleta => 
-    boleta.estado === 'PAGADA' // ← Usa 'PAGADA' directamente
+    boleta.estado === 'PAGADA' || boleta.estado === 'Pagado'
   ).length;
 
   return (
