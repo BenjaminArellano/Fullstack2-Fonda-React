@@ -30,7 +30,7 @@ function Registro() {
       return;
     }
 
-    const correosValidos = ["@gmail.com", "@duocuc.cl", "@profesor.duoc.cl", "@fondaduoc.cl", "@admin.cl","@vendedor.cl"];
+    const correosValidos = ["@gmail.com", "@duocuc.cl", "@profesor.duoc.cl", "@fondaduoc.cl"];
     if (!correosValidos.some(domain => correo.includes(domain))) {
       setError("Por favor, ingresa un correo válido (@gmail.com, @duocuc.cl, etc.).");
       setLoading(false);

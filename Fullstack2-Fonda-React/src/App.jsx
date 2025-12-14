@@ -27,6 +27,8 @@ import ProductosAdmin from './pages/admin/Productos.jsx'
 import CategoriasAdmin from './pages/admin/Categorias.jsx'
 import Ordenes from './pages/admin/Ordenes.jsx'
 
+import ProtectedRoute from './components/ProtectedRoute.jsx';
+
 // 👉 IMPORT PAYPAL
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 
@@ -65,16 +67,68 @@ function App() {
             </>
           } />
           
-          <Route path="/admin/*" element={<AdminLayout />}>
-            <Route path="" element={<Navigate to="Dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="usuarios" element={<Users />} />
-            <Route path="productos" element={<ProductosAdmin />} />
-            <Route path="categorias" element={<CategoriasAdmin />} />
-            <Route path="ordenes" element={<Ordenes/>} />
-            
-            <Route path="*" element={<Navigate to="dashboard" replace />} />
-          </Route>
+          <Route path="/admin/*" element={
+  <ProtectedRoute allowedRoles={['admin', 'vendedor']}>
+    <AdminLayout />
+  </ProtectedRoute>
+}>
+  {/* Solo admin puede ver dashboard */}
+  <Route path="dashboard" element={
+    <ProtectedRoute allowedRoles={['admin']}>
+      <Dashboard />
+    </ProtectedRoute>
+  } />
+  
+  {/* Solo admin puede ver usuarios */}
+  <Route path="usuarios" element={
+    <ProtectedRoute allowedRoles={['admin']}>
+      <Users />
+    </ProtectedRoute>
+  } />
+  
+  {/* Tanto admin como vendedor pueden ver productos */}
+  <Route path="productos" element={
+    <ProtectedRoute allowedRoles={['admin', 'vendedor']}>
+      <ProductosAdmin />
+    </ProtectedRoute>
+  } />
+  
+  {/* Solo admin puede ver categorías */}
+  <Route path="categorias" element={
+    <ProtectedRoute allowedRoles={['admin']}>
+      <CategoriasAdmin />
+    </ProtectedRoute>
+  } />
+  
+  {/* Tanto admin como vendedor pueden ver boletas/órdenes */}
+  <Route path="ordenes" element={
+    <ProtectedRoute allowedRoles={['admin', 'vendedor']}>
+      <Ordenes />
+    </ProtectedRoute>
+  } />
+  
+  {/* Ruta por defecto para admin/vendedor */}
+  <Route path="" element={
+    <ProtectedRoute allowedRoles={['admin', 'vendedor']}>
+      {/* Redirigir según el rol */}
+      {(usuarioLogueado) => {
+        const rol = usuarioLogueado?.rol?.toLowerCase() || '';
+        if (rol === 'admin') {
+          return <Navigate to="dashboard" replace />;
+        } else if (rol === 'vendedor') {
+          return <Navigate to="productos" replace />;
+        }
+        return <Navigate to="/" replace />;
+      }}
+    </ProtectedRoute>
+  } />
+  
+  <Route path="*" element={
+    <ProtectedRoute allowedRoles={['admin', 'vendedor']}>
+      <Navigate to="" replace />
+    </ProtectedRoute>
+  } />
+</Route>
         </Routes>
 
       </PayPalScriptProvider>

@@ -1,380 +1,215 @@
 // src/services/DataService.js
-const BASE_URL = "http://localhost:8088/v1";
 
-const handleResponse = async (res) => {
+const BASE_URL = "http://localhost:8088/v1";
+const API_KEY = "123456"; 
+
+// Función base para todas las peticiones
+const request = async (endpoint, options = {}) => {
+  const config = {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": API_KEY,
+      ...(options.headers || {}),
+    },
+  };
+
+  const res = await fetch(`${BASE_URL}${endpoint}`, config);
+
   if (!res.ok) {
-    const error = await res.text();
-    throw new Error(error || "Error en la petición");
+    const errorText = await res.text();
+    throw new Error(errorText || "Error en la petición");
   }
-  return res.json();
+
+  // Si la respuesta no es JSON
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    return res.json();
+  }
+  return res.text();
 };
 
 const DataService = {
-
   // =================== USUARIOS ===================
-  addUsuario: async (usuario) => {
-    const res = await fetch(`${BASE_URL}/addUsuario`, {
+  addUsuario: (usuario) =>
+    request("/addUsuario", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(usuario),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  getMiPerfil: async () => {
-  try {
-    // Obtener el ID del usuario logueado del localStorage
-    const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado') || '{}');
-    const usuarioId = usuarioLogueado.usuId;
-    
-    if (!usuarioId) {
-      throw new Error('No hay usuario logueado. Por favor, inicia sesión nuevamente.');
-    }
-    
-    console.log('Obteniendo perfil para usuario ID:', usuarioId);
-    
-    const res = await fetch(`${BASE_URL}/usuariosById/${usuarioId}`);
-    if (!res.ok) {
-      throw new Error(`Error ${res.status}: ${res.statusText}`);
-    }
-    
-    const perfil = await res.json();
-    console.log('Perfil obtenido:', perfil);
-    
-    return perfil;
-  } catch (error) {
-    console.error('Error en getMiPerfil:', error);
-    throw error;
-  }
-},
+  addUsuarios: (usuarios) =>
+    request("/addUsuarios", {
+      method: "POST",
+      body: JSON.stringify(usuarios),
+    }),
 
-updateMiPerfil: async (perfilData) => {
-  try {
-    const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado') || '{}');
-    const usuarioId = usuarioLogueado.usuId;
-    
-    if (!usuarioId) {
-      throw new Error('No hay usuario logueado. Por favor, inicia sesión nuevamente.');
-    }
+  getUsuarios: () => request("/usuarios"),
 
-    // PREPARAR DATOS COMPLETOS para el backend
-    const datosActualizacion = {
-      usuId: usuarioId, // ← ESTE ES EL CAMPO CRÍTICO QUE FALTABA
-      nombreCompleto: perfilData.nombreCompleto,
-      correo: perfilData.correo,
-      rol: usuarioLogueado.rol // ← Mantener el rol actual
-    };
+  getUsuarioById: (id) => request(`/usuariosById/${id}`),
 
-    console.log('📤 Enviando datos de actualización al backend:', datosActualizacion);
+  getUsuarioByNombre: (nombre) =>
+    request(`/usuariosByNombre/${nombre}`),
 
-    const res = await fetch(`${BASE_URL}/updateUsuario`, {
+  getUsuarioByRut: (rut) =>
+    request(`/usuariosByRut/${rut}`),
+
+  getUsuarioByCorreo: (correo) =>
+    request(`/usuariosByCorreo/${correo}`),
+
+  updateUsuario: (usuario) =>
+    request("/updateUsuario", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(datosActualizacion),
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('❌ Error del servidor:', errorText);
-      throw new Error(`Error ${res.status}: ${errorText}`);
-    }
-    
-    const resultado = await res.json();
-    console.log('✅ Perfil actualizado exitosamente:', resultado);
-    
-    return resultado;
-  } catch (error) {
-    console.error('❌ Error en updateMiPerfil:', error);
-    throw error;
-  }
-},
-
-  getUsuarios: async () => {
-    const res = await fetch(`${BASE_URL}/usuarios`);
-    return handleResponse(res);
-  },
-
-  getUsuarioById: async (id) => {
-    const res = await fetch(`${BASE_URL}/usuarios/${id}`);
-    return handleResponse(res);
-  },
-
-  deleteUsuario: async (id) => {
-    const res = await fetch(`${BASE_URL}/deleteUsuario/${id}`, { method: "DELETE" });
-    return handleResponse(res);
-  },
-
-  deleteUsuarioCascada: async (id) => {
-    const res = await fetch(`${BASE_URL}/deleteUsuarioCascada/${id}`, { 
-      method: "DELETE" 
-    });
-    return handleResponse(res);
-  },
-
-  updateUsuario: async (usuario) => {
-    const res = await fetch(`${BASE_URL}/updateUsuario`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(usuario),
-    });
-    return handleResponse(res);
-  },
+    }),
+
+  deleteUsuario: (id) =>
+    request(`/deleteUsuario/${id}`, {
+      method: "DELETE",
+    }),
+
+  deleteUsuarioCascada: (id) =>
+    request(`/deleteUsuarioCascada/${id}`, {
+      method: "DELETE",
+    }),
 
   // =================== PRODUCTOS ===================
-  addProducto: async (producto) => {
-    const res = await fetch(`${BASE_URL}/addProducto`, {
+  addProducto: (producto) =>
+    request("/addProducto", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(producto),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  addProductos: async (productos) => {
-    const res = await fetch(`${BASE_URL}/addProductos`, {
+  addProductos: (productos) =>
+    request("/addProductos", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(productos),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  getProductos: async () => {
-    const res = await fetch(`${BASE_URL}/productos`);
-    return handleResponse(res);
-  },
+  getProductos: () => request("/productos"),
 
-  getProductoById: async (id) => {
-    const res = await fetch(`${BASE_URL}/productosById/${id}`);
-    return handleResponse(res);
-  },
+  getProductoById: (id) =>
+    request(`/productosById/${id}`),
 
-  getProductoByName: async (nombre) => {
-    const res = await fetch(`${BASE_URL}/productoByName/${nombre}`);
-    return handleResponse(res);
-  },
+  getProductoByName: (nombre) =>
+    request(`/productoByName/${nombre}`),
 
-  updateProducto: async (producto) => {
-    const res = await fetch(`${BASE_URL}/updateProducto`, {
+  updateProducto: (producto) =>
+    request("/updateProducto", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(producto),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  deleteProducto: async (id) => {
-  try {
-    const res = await fetch(`${BASE_URL}/deleteProducto/${id}`, { 
-      method: "DELETE" 
-    });
-    
-    // Intentar parsear como JSON primero
-    const contentType = res.headers.get('content-type');
-    
-    if (contentType && contentType.includes('application/json')) {
-      return await handleResponse(res);
-    } else {
-      // Si no es JSON, devolver el texto plano
-      const textResponse = await res.text();
-      if (!res.ok) {
-        throw new Error(textResponse || "Error en la eliminación");
-      }
-      return textResponse || "Producto eliminado exitosamente";
-    }
-  } catch (error) {
-    console.error('Error en deleteProducto:', error);
-    throw error;
-  }
-},
+  deleteProducto: (id) =>
+    request(`/deleteProducto/${id}`, {
+      method: "DELETE",
+    }),
 
-deleteProductoCascada: async (id) => {
-    try {
-      const res = await fetch(`${BASE_URL}/deleteProductoCascada/${id}`, { 
-        method: "DELETE" 
-      });
-      
-      // Intentar parsear como JSON primero
-      const contentType = res.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        return await handleResponse(res);
-      } else {
-        // Si no es JSON, devolver el texto plano
-        const textResponse = await res.text();
-        if (!res.ok) {
-          throw new Error(textResponse || "Error en la eliminación con cascada");
-        }
-        return textResponse || "Producto y registros relacionados eliminados exitosamente";
-      }
-    } catch (error) {
-      console.error('Error en deleteProductoCascada:', error);
-      throw error;
-    }
-  },
+  deleteProductoCascada: (id) =>
+    request(`/deleteProductoCascada/${id}`, {
+      method: "DELETE",
+    }),
 
   // =================== CATEGORIAS ===================
-  addCategoria: async (categoria) => {
-    const res = await fetch(`${BASE_URL}/nuevaCategoria`, {
+  addCategoria: (categoria) =>
+    request("/nuevaCategoria", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(categoria),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  addCategorias: async (categorias) => {
-    const res = await fetch(`${BASE_URL}/nuevasCategorias`, {
+  addCategorias: (categorias) =>
+    request("/nuevasCategorias", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(categorias),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  getCategorias: async () => {
-    const res = await fetch(`${BASE_URL}/categorias`);
-    return handleResponse(res);
-  },
+  getCategorias: () => request("/categorias"),
 
-  getCategoriaById: async (id) => {
-    const res = await fetch(`${BASE_URL}/categoria/${id}`);
-    return handleResponse(res);
-  },
+  getCategoriaById: (id) =>
+    request(`/categoria/${id}`),
 
-  updateCategoria: async (categoria) => {
-    const res = await fetch(`${BASE_URL}/actualizarCategoria`, {
+  updateCategoria: (categoria) =>
+    request("/actualizarCategoria", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(categoria),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  deleteCategoria: async (id) => {
-    const res = await fetch(`${BASE_URL}/eliminarCategoria/${id}`, { method: "DELETE" });
-    return handleResponse(res);
-  },
+  deleteCategoria: (id) =>
+    request(`/eliminarCategoria/${id}`, {
+      method: "DELETE",
+    }),
 
   // =================== BOLETAS ===================
-  addBoleta: async (boleta) => {
-    const res = await fetch(`${BASE_URL}/nuevaBoleta`, {
+  addBoleta: (boleta) =>
+    request("/nuevaBoleta", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(boleta),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  addBoletas: async (boletas) => {
-    const res = await fetch(`${BASE_URL}/nuevasBoletas`, {
+  addBoletas: (boletas) =>
+    request("/nuevasBoletas", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(boletas),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  getBoletas: async () => {
-    const res = await fetch(`${BASE_URL}/boletas`);
-    return handleResponse(res);
-  },
+  getBoletas: () => request("/boletas"),
 
-  getBoletaById: async (id) => {
-    const res = await fetch(`${BASE_URL}/boletas/${id}`);
-    return handleResponse(res);
-  },
+  getBoletaById: (id) =>
+    request(`/boletas/${id}`),
 
-  getBoletasByCliente: async (cliente) => {
-    const res = await fetch(`${BASE_URL}/boletas/cliente/${cliente}`);
-    return handleResponse(res);
-  },
+  getBoletasByCliente: (cliente) =>
+    request(`/boletas/cliente/${cliente}`),
 
-  getBoletasByFecha: async (fecha) => {
-    const res = await fetch(`${BASE_URL}/boletas/fecha/${fecha}`);
-    return handleResponse(res);
-  },
+  getBoletasByFecha: (fecha) =>
+    request(`/boletas/fecha/${fecha}`),
 
-  getBoletasByEstado: async (estado) => {
-    const res = await fetch(`${BASE_URL}/boletas/estado/${estado}`);
-    return handleResponse(res);
-  },
+  getBoletasByEstado: (estado) =>
+    request(`/boletas/estado/${estado}`),
 
-  getBoletasByRut: async (rut) => {
-    const res = await fetch(`${BASE_URL}/boletas/rut/${rut}`);
-    return handleResponse(res);
-  },
+  getBoletasByRut: (rut) =>
+    request(`/boletas/rut/${rut}`),
 
-  updateBoleta: async (boleta) => {
-    const res = await fetch(`${BASE_URL}/actualizarBoleta`, {
+  getBoletasByUsuario: (usuarioId) =>
+    request(`/boletas/usuario/${usuarioId}`),
+
+  updateBoleta: (boleta) =>
+    request("/actualizarBoleta", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(boleta),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  deleteBoleta: async (id) => {
-    const res = await fetch(`${BASE_URL}/eliminarBoleta/${id}`, { method: "DELETE" });
-    return handleResponse(res);
-  },
-
-  getBoletasByUsuario: async (usuarioId) => {
-  try {
-    const res = await fetch(`${BASE_URL}/boletas/usuario/${usuarioId}`);
-    if (!res.ok) {
-      throw new Error(`Error ${res.status}: ${res.statusText}`);
-    }
-    return await res.json();
-  } catch (error) {
-    console.error('Error en getBoletasByUsuario:', error);
-    throw error;
-  }
-},
+  deleteBoleta: (id) =>
+    request(`/eliminarBoleta/${id}`, {
+      method: "DELETE",
+    }),
 
   // =================== DETALLE BOLETAS ===================
-  addDetalleBoleta: async (detalle) => {
-    const res = await fetch(`${BASE_URL}/nuevaDetalleBoleta`, {
+  addDetalleBoleta: (detalle) =>
+    request("/nuevaDetalleBoleta", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(detalle),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  addDetallesBoletas: async (detalles) => {
-    const res = await fetch(`${BASE_URL}/nuevasDetallesBoletas`, {
+  addDetallesBoletas: (detalles) =>
+    request("/nuevasDetallesBoletas", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(detalles),
-    });
-    return handleResponse(res);
-  },
+    }),
 
-  getDetallesBoletas: async () => {
-    const res = await fetch(`${BASE_URL}/detallesBoletas`);
-    return handleResponse(res);
-  },
+  getDetallesBoletas: () => request("/detallesBoletas"),
 
-  getDetalleBoletaById: async (id) => {
-    const res = await fetch(`${BASE_URL}/detallesBoletas/${id}`);
-    return handleResponse(res);
-  },
+  getDetalleBoletaById: (id) =>
+    request(`/detallesBoletas/${id}`),
 
-  deleteDetalleBoleta: async (id) => {
-    const res = await fetch(`${BASE_URL}/eliminarDetalleBoleta/${id}`, { method: "DELETE" });
-    return handleResponse(res);
-  },
+  deleteDetalleBoleta: (id) =>
+    request(`/eliminarDetalleBoleta/${id}`, {
+      method: "DELETE",
+    }),
 
-  // =================== OFERTAS (NUEVO) ===================
-  getOfertas: async () => {
-    const res = await fetch(`${BASE_URL}/ofertas`);
-    return handleResponse(res);
-  },
-  getOfertaById: async (id) => {
-  const res = await fetch(`${BASE_URL}/ofertaById/${id}`);
-  return handleResponse(res);
-}
+  // =================== OFERTAS ===================
+  getOfertas: () => request("/ofertas"),
+
+  getOfertaById: (id) =>
+    request(`/ofertaById/${id}`),
 };
 
 export default DataService;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DataService from '../../utils/DataService';
+import { loadFromLocalstorage } from '../../utils/localstorageHelper';
 
 const Productos = () => {
   const [productos, setProductos] = useState([]);
@@ -25,6 +26,9 @@ const Productos = () => {
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  const [usuarioLogueado, setUsuarioLogueado] = useState(null);
+  const [esVendedor, setEsVendedor] = useState(false);
 
   // Estados para categorías - AHORA DESDE LA BD
   const [categorias, setCategorias] = useState([]);
@@ -70,6 +74,23 @@ const Productos = () => {
     }
   };
 
+  const cargarUsuarioLogueado = () => {
+    try {
+      const usuario = loadFromLocalstorage('usuarioLogueado');
+      if (usuario) {
+        console.log("✅ Usuario logueado cargado:", usuario);
+        setUsuarioLogueado(usuario);
+        setEsVendedor(usuario.rol?.toLowerCase() === 'vendedor');
+      } else {
+        console.warn("⚠️ No hay usuario logueado");
+        // Redirigir si no está logueado
+        window.location.href = '/login';
+      }
+    } catch (error) {
+      console.error("❌ Error al cargar usuario:", error);
+    }
+  };
+
   // Cargar categorías DESDE LA BASE DE DATOS
   const cargarCategorias = async () => {
     try {
@@ -96,6 +117,15 @@ const Productos = () => {
       setCategorias([]);
     }
   };
+
+  useEffect(() => {
+    // Primero cargar el usuario
+    cargarUsuarioLogueado();
+    
+    // Luego cargar productos y categorías
+    cargarProductos();
+    cargarCategorias();
+  }, []);
 
   useEffect(() => {
     cargarProductos();
@@ -484,14 +514,18 @@ const Productos = () => {
                     >
                       <i className="bi bi-arrow-clockwise"></i>
                     </button>
-                    <button 
-                      className="btn btn-primary flex-fill"
-                      onClick={handleOpenAddModal}
-                      title="Agregar producto"
-                      disabled={loading || categorias.length === 0}
-                    >
-                      <i className="bi bi-plus-lg"></i>
-                    </button>
+                    
+                    {/* SOLO ADMIN PUEDE AGREGAR PRODUCTOS */}
+                    {!esVendedor && (
+                      <button 
+                        className="btn btn-primary flex-fill"
+                        onClick={handleOpenAddModal}
+                        title="Agregar producto"
+                        disabled={loading || categorias.length === 0}
+                      >
+                        <i className="bi bi-plus-lg"></i>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -514,6 +548,13 @@ const Productos = () => {
                         <span className="badge bg-warning text-dark">
                           <i className="bi bi-exclamation-triangle me-1"></i>
                           No hay categorías disponibles
+                        </span>
+                      )}
+                      {/* Mostrar badge si es vendedor */}
+                      {esVendedor && (
+                        <span className="badge bg-info text-white">
+                          <i className="bi bi-person-check me-1"></i>
+                          Modo Vendedor
                         </span>
                       )}
                       {filteredProductos.length !== productos.length && (
@@ -607,6 +648,13 @@ const Productos = () => {
                 <h3 className="card-title mb-0" style={{ color: '#333', fontSize: '1.25rem' }}>
                   Listado de Productos
                 </h3>
+
+                {esVendedor && (
+                  <span className="badge bg-info text-white">
+                    <i className="bi bi-eye me-1"></i>
+                    Solo lectura
+                  </span>
+                )}
                 
                 {/* Información de filtros activos */}
                 <div className="d-flex gap-2">
@@ -704,32 +752,36 @@ const Productos = () => {
                           </span>
                         </td>
                         <td style={{ border: 'none', padding: '12px 16px', textAlign: 'center' }}>
-                          <button 
-                            className="btn btn-sm btn-outline-primary me-1"
-                            onClick={() => handleOpenEditModal(producto)}
-                            title="Editar producto"
-                            disabled={loading}
-                            style={{ 
-                              border: '1px solid #007bff',
-                              borderRadius: '4px',
-                              padding: '0.25rem 0.5rem'
-                            }}
-                          >
-                            <i className="bi bi-pencil"></i>
-                          </button>
-                          <button 
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={() => handleDeleteProducto(producto.prodId)}
-                            title="Eliminar producto"
-                            disabled={loading}
-                            style={{ 
-                              border: '1px solid #dc3545',
-                              borderRadius: '4px',
-                              padding: '0.25rem 0.5rem'
-                            }}
-                          >
-                            <i className="bi bi-trash"></i>
-                          </button>
+                          {!esVendedor && (
+                            <button 
+                              className="btn btn-sm btn-outline-primary me-1"
+                              onClick={() => handleOpenEditModal(producto)}
+                              title="Editar producto"
+                              disabled={loading}
+                              style={{ 
+                                border: '1px solid #007bff',
+                                borderRadius: '4px',
+                                padding: '0.25rem 0.5rem'
+                              }}
+                            >
+                              <i className="bi bi-pencil"></i>
+                            </button>
+                          )}
+                          {!esVendedor && (
+                            <button 
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleDeleteProducto(producto.prodId)}
+                              title="Eliminar producto"
+                              disabled={loading}
+                              style={{ 
+                                border: '1px solid #dc3545',
+                                borderRadius: '4px',
+                                padding: '0.25rem 0.5rem'
+                              }}
+                            >
+                              <i className="bi bi-trash"></i>
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -754,6 +806,7 @@ const Productos = () => {
       </div>
 
       {/* Reportes de Productos */}
+      {!esVendedor && (
       <div className="row mt-5">
         <div className="col-12">
           <h4 className="mb-4" style={{ color: '#333', borderBottom: '2px solid #007bff', paddingBottom: '0.5rem' }}>
@@ -859,10 +912,11 @@ const Productos = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* ✅ MODAL AGREGAR PRODUCTO ACTUALIZADO CON STOCK */}
       {/* ✅ MODAL AGREGAR PRODUCTO ACTUALIZADO CON CATEGORÍAS REALES */}
-{showAddModal && (
+{showAddModal && !esVendedor && (
   <>
     <div className="modal-backdrop show"></div>
     <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1060 }}>
@@ -1038,7 +1092,7 @@ const Productos = () => {
 )}
 
       {/* ✅ MODAL EDITAR PRODUCTO ACTUALIZADO CON STOCK */}
-      {showEditModal && selectedProducto && (
+      {showEditModal && selectedProducto && !esVendedor && (
   <>
     <div className="modal-backdrop show"></div>
     <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1060 }}>

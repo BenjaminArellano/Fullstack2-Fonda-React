@@ -13,6 +13,8 @@ const AdminLayout = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
+
+  const [userRole, setUserRole] = useState(''); 
   
   // Estado para el perfil del admin conectado a la base de datos
   const [adminProfile, setAdminProfile] = useState({
@@ -25,6 +27,8 @@ const AdminLayout = () => {
     rut: '',
     rol: 'Administrador'
   });
+
+  const navigate = useNavigate();
 
   // Función para verificar sesión
   const verificarSesion = () => {
@@ -55,11 +59,27 @@ const AdminLayout = () => {
       if (usuarioLogueado && usuarioLogueado.usuId) {
         console.log('✅ Usuario logueado encontrado en localStorage:', usuarioLogueado);
         
+        // AÑADIR: Obtener rol del usuario
+        const rolUsuario = usuarioLogueado.rol?.toLowerCase() || '';
+        setUserRole(rolUsuario);
+        
         // Dividir nombre completo en nombres y apellidos
         const nombreCompleto = usuarioLogueado.nombreCompleto || '';
         const nombresArray = nombreCompleto.split(' ');
         const nombres = nombresArray[0] || '';
         const apellidos = nombresArray.slice(1).join(' ') || nombreCompleto;
+        
+        // Determinar título del rol para mostrar
+        let tituloRol = '';
+        if (rolUsuario === 'admin') {
+          tituloRol = 'Administrador Principal';
+        } else if (rolUsuario === 'vendedor') {
+          tituloRol = 'Vendedor';
+        } else if (rolUsuario === 'cliente') {
+          tituloRol = 'Cliente';
+        } else {
+          tituloRol = 'Usuario';
+        }
         
         const perfilData = {
           usuId: usuarioLogueado.usuId,
@@ -69,7 +89,7 @@ const AdminLayout = () => {
           correo: usuarioLogueado.correo || '',
           direccion: 'Av. Principal 123, Santiago, Chile',
           rut: usuarioLogueado.rut || '',
-          rol: usuarioLogueado.rol || 'Administrador'
+          rol: tituloRol
         };
         
         setAdminProfile(perfilData);
@@ -80,10 +100,25 @@ const AdminLayout = () => {
         console.log('🔄 Cargando perfil desde API...');
         const perfil = await DataService.getMiPerfil();
         
+        // AÑADIR: Obtener rol del usuario
+        const rolUsuario = perfil.rol?.toLowerCase() || '';
+        setUserRole(rolUsuario);
+        
         const nombreCompleto = perfil.nombreCompleto || '';
         const nombresArray = nombreCompleto.split(' ');
         const nombres = nombresArray[0] || '';
         const apellidos = nombresArray.slice(1).join(' ') || nombreCompleto;
+        
+        let tituloRol = '';
+        if (rolUsuario === 'admin') {
+          tituloRol = 'Administrador Principal';
+        } else if (rolUsuario === 'vendedor') {
+          tituloRol = 'Vendedor';
+        } else if (rolUsuario === 'cliente') {
+          tituloRol = 'Cliente';
+        } else {
+          tituloRol = 'Usuario';
+        }
         
         const perfilData = {
           usuId: perfil.usuId,
@@ -93,7 +128,7 @@ const AdminLayout = () => {
           correo: perfil.correo || '',
           direccion: 'Av. Principal 123, Santiago, Chile',
           rut: perfil.rut || '',
-          rol: perfil.rol || 'Administrador'
+          rol: tituloRol
         };
         
         setAdminProfile(perfilData);
@@ -107,6 +142,20 @@ const AdminLayout = () => {
       setLoadingProfile(false);
     }
   };
+
+  const esVendedor = () => {
+    return userRole === 'vendedor';
+  };
+
+    // AÑADIR: Redirigir si es vendedor y está en ruta no permitida
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (esVendedor() && 
+        !path.includes('/admin/productos') && 
+        !path.includes('/admin/ordenes')) {
+      navigate('/admin/productos');
+    }
+  }, [userRole, navigate]);
 
   // Cargar perfil por defecto
   const cargarPerfilPorDefecto = () => {
@@ -141,8 +190,6 @@ const AdminLayout = () => {
   const togglePopover = (popoverName) => {
     setActivePopover(activePopover === popoverName ? null : popoverName);
   };
-
-  const navigate = useNavigate();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -302,20 +349,24 @@ const AdminLayout = () => {
                 style={{ width: '80px', height: '60px', marginLeft: '0.5rem', marginRight: '0.8rem', objectFit: 'contain', borderRadius: '50px' }}
               />
               <span style={{
-                fontWeight: 900,
-                fontSize: '1.25rem',
-                fontFamily: "'Montserrat', sans-serif",
-                color: '#d32f2f',
-                letterSpacing: '1.5px'
-              }}>
-                {loadingProfile ? (
-                  '🔄 Cargando...'
-                ) : (
-                  <span dangerouslySetInnerHTML={{
-                    __html: `👋 ¡Buenos días, pariente <span style="color: #0D47A1">${adminProfile.apellidos}</span>! 🎉`
-                  }} />
-                )}
-              </span>
+    fontWeight: 900,
+    fontSize: '1.25rem',
+    fontFamily: "'Montserrat', sans-serif",
+    color: '#d32f2f',
+    letterSpacing: '1.5px'
+  }}>
+    {loadingProfile ? (
+      '🔄 Cargando...'
+    ) : esVendedor() ? (
+      <span dangerouslySetInnerHTML={{
+        __html: `👋 ¡Buenos días, <span style="color: #0D47A1">Vendedor</span>! 🎉`
+      }} />
+    ) : (
+      <span dangerouslySetInnerHTML={{
+        __html: `👋 ¡Buenos días, pariente <span style="color: #0D47A1">${adminProfile.apellidos}</span>! 🎉`
+      }} />
+    )}
+  </span>
             </div>
             
             {/* Bloque derecho: chat soporte y usuario */}

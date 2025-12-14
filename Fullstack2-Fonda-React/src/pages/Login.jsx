@@ -55,21 +55,27 @@ function Login() {
 
       setToken(tokenGenerado);
 
-      if (usuarioEncontrado.rol === "admin" || usuarioEncontrado.rol === "ADMIN") {
-        navigate("/admin/dashboard");
-        return;
-      }
-
+      const rolUsuario = usuarioEncontrado.rol?.toLowerCase() || '';
+    
+    if (rolUsuario === "admin" || rolUsuario === "administrador") {
+      navigate("/admin/dashboard");
+    } else if (rolUsuario === "vendedor") {
+      // REDIRIGIR VENDEDORES AL PANEL ADMIN
+      navigate("/admin/productos"); // O /admin/ si tienes una ruta por defecto
+    } else {
+      // Solo clientes van a la página principal
       navigate("/");
-      setCorreo("");
-      setClave("");
-
-    } catch (error) {
-      setError("Error al intentar iniciar sesión. Intenta nuevamente.");
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    setCorreo("");
+    setClave("");
+
+  } catch (error) {
+    setError("Error al intentar iniciar sesión. Intenta nuevamente.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleLogout = () => {
     removeFromLocalstorage("token");
