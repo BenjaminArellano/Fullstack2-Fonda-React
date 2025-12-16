@@ -247,61 +247,63 @@ const AdminLayout = () => {
 
   // Guardar perfil en la base de datos
   const handleSaveProfile = async () => {
-    try {
-      setLoadingProfile(true);
-      
-      // Reconstruir nombre completo
-      const nombreCompleto = `${adminProfile.nombres} ${adminProfile.apellidos}`.trim();
-      
-      const datosActualizacion = {
-        nombreCompleto: nombreCompleto,
-        correo: adminProfile.correo
-      };
-      
-      console.log('💾 Guardando perfil:', datosActualizacion);
-      
-      // Verificar que el método existe antes de llamarlo
-      if (!DataService.updateMiPerfil) {
-        throw new Error('El método updateMiPerfil no está disponible en DataService');
-      }
-      
-      // Actualizar en la base de datos
-      await DataService.updateMiPerfil(datosActualizacion);
-      
-      // Actualizar estado local
-      setAdminProfile(prev => ({
-        ...prev,
-        nombreCompleto: nombreCompleto
-      }));
-      
-      // Guardar en localStorage
-      const perfilActualizado = {
-        ...adminProfile,
-        nombreCompleto: nombreCompleto
-      };
-      localStorage.setItem('adminProfile', JSON.stringify(perfilActualizado));
-      
-      // Actualizar usuario en localStorage
-      const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado') || '{}');
-      if (usuarioLogueado.usuId === adminProfile.usuId) {
-        usuarioLogueado.nombreCompleto = nombreCompleto;
-        usuarioLogueado.correo = adminProfile.correo;
-        localStorage.setItem('usuarioLogueado', JSON.stringify(usuarioLogueado));
-      }
-      
-      // Disparar evento para notificar a otros componentes
-      window.dispatchEvent(new Event('adminProfileUpdated'));
-      
-      alert('✅ Perfil actualizado correctamente');
-      setIsEditing(false);
-      
-    } catch (error) {
-      console.error('❌ Error al guardar perfil:', error);
-      alert('❌ Error al actualizar perfil: ' + error.message);
-    } finally {
-      setLoadingProfile(false);
+  try {
+    setLoadingProfile(true);
+    
+    // Reconstruir nombre completo
+    const nombreCompleto = `${adminProfile.nombres} ${adminProfile.apellidos}`.trim();
+    
+    // Crear objeto usuario completo para actualizar
+    const usuarioActualizado = {
+      usuId: adminProfile.usuId,  // ¡IMPORTANTE! Incluir el ID
+      nombreCompleto: nombreCompleto,
+      correo: adminProfile.correo,
+      // Agrega otros campos requeridos por tu entidad Usuario
+      rut: adminProfile.rut,
+      rol: adminProfile.rol.toLowerCase().includes('admin') ? 'admin' : 
+           adminProfile.rol.toLowerCase().includes('vendedor') ? 'vendedor' : 'cliente'
+    };
+    
+    console.log('💾 Actualizando usuario completo:', usuarioActualizado);
+    
+    // Usar el método existente updateUsuario
+    const respuesta = await DataService.updateUsuario(usuarioActualizado);
+    
+    // Actualizar estado local
+    setAdminProfile(prev => ({
+      ...prev,
+      nombreCompleto: nombreCompleto,
+      rol: usuarioActualizado.rol === 'admin' ? 'Administrador Principal' :
+           usuarioActualizado.rol === 'vendedor' ? 'Vendedor' : 'Cliente'
+    }));
+    
+    // Guardar en localStorage
+    const perfilActualizado = {
+      ...adminProfile,
+      nombreCompleto: nombreCompleto
+    };
+    localStorage.setItem('adminProfile', JSON.stringify(perfilActualizado));
+    
+    // Actualizar usuario en localStorage
+    const usuarioLogueado = JSON.parse(localStorage.getItem('usuarioLogueado') || '{}');
+    if (usuarioLogueado.usuId === adminProfile.usuId) {
+      usuarioLogueado.nombreCompleto = nombreCompleto;
+      usuarioLogueado.correo = adminProfile.correo;
+      localStorage.setItem('usuarioLogueado', JSON.stringify(usuarioLogueado));
     }
-  };
+    
+    window.dispatchEvent(new Event('adminProfileUpdated'));
+    
+    alert('✅ Perfil actualizado correctamente');
+    setIsEditing(false);
+    
+  } catch (error) {
+    console.error('❌ Error al guardar perfil:', error);
+    alert('❌ Error al actualizar perfil: ' + (error.message || 'Error desconocido'));
+  } finally {
+    setLoadingProfile(false);
+  }
+};
 
   const handleCancelEdit = () => {
     cargarPerfilReal();
